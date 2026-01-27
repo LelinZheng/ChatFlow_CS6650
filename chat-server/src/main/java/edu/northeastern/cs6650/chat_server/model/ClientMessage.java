@@ -2,6 +2,13 @@ package edu.northeastern.cs6650.chat_server.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
+/**
+ * Represents a message sent by a client over WebSocket.
+ * <p>
+ * This object is used to deserialize incoming WebSocket messages
+ * and encapsulates metadata such as sender identity, message type,
+ * and timestamp.
+ */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ClientMessage {
   private String userId;
@@ -10,6 +17,9 @@ public class ClientMessage {
   private Messagetype messageType;
   private String timestamp;
 
+  /**
+   * Default constructor.
+   */
   public ClientMessage() {
   }
 

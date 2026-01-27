@@ -6,9 +6,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
 
+/**
+ * Utility class responsible for validating incoming client message data.
+ * <p>
+ * This class centralizes validation logic for user identifiers,
+ * usernames, and other message-related constraints.
+ */
 public class MessageValidator {
   private static final Pattern USERNAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_]{3,20}$");
   private static final int USER_ID_MAX = 100000;
+
+  /**
+   * Validate the given ClientMessage.
+   * @param msg the ClientMessage to validate
+   * @return a list of validation error messages, empty if valid
+   */
   public static List<String> validate(ClientMessage msg) {
     List<String> errors = new ArrayList<>();
 

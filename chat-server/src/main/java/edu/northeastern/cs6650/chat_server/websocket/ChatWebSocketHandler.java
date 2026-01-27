@@ -14,19 +14,39 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * WebSocket handler responsible for processing chat messages.
+ * <p>
+ * Handles incoming text messages, deserializes client payloads,
+ * applies validation, and sends responses back to connected clients.
+ */
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
   private final ObjectMapper objectMapper;
 
+  /**
+   * Constructor for ChatWebSocketHandler.
+   * @param objectMapper the ObjectMapper for JSON processing
+   */
   public ChatWebSocketHandler(ObjectMapper objectMapper) {
     this.objectMapper = objectMapper;
   }
 
+  /**
+   * Handle new WebSocket connection establishment.
+   * @param session the WebSocket session
+   */
   public void afterConnectionEstablished(WebSocketSession session) {
     System.out.println("New WebSocket connection established: " + session.getId());
   }
 
+  /**
+   * Handle incoming text messages from clients.
+   * @param session the WebSocket session
+   * @param message the incoming text message
+   * @throws IOException if an I/O error occurs
+   */
   protected void handleTextMessage(WebSocketSession session, TextMessage message)
       throws IOException {
 
@@ -70,6 +90,11 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     );
   }
 
+  /**
+   * Handle WebSocket connection closure.
+   * @param session the WebSocket session
+   * @param status the close status
+   */
   public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
     System.out.println("WebSocket connection closed: " + session.getId());
   }
