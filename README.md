@@ -73,7 +73,8 @@ Extends the client with detailed latency tracking, statistical analysis, and CSV
 
 ## Deployment
 
-The server is deployed on an **AWS EC2 free-tier instance** in **us-west-2**.  
+The server is **deployed and running** on an **AWS EC2 free-tier instance** in **us-west-2**.  
+The application is packaged as a standalone Spring Boot JAR and managed using Linux process management tools.  
 Evidence of deployment and test execution is included in the submission PDF under `/results`.
 
 ---
