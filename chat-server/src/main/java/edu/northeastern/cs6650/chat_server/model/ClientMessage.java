@@ -7,35 +7,49 @@ public class ClientMessage {
   private String userId;
   private String username;
   private String message;
-  private Messagetype type;
+  private Messagetype messageType;
   private String timestamp;
 
-  public ClientMessage(String userId, String username, String message, Messagetype type,
-      String timestamp) {
-    this.userId = userId;
-    this.username = username;
-    this.message = message;
-    this.type = type;
-    this.timestamp = timestamp;
+  public ClientMessage() {
   }
 
   public String getUserId() {
     return userId;
   }
 
+  public void setUserId(String userId) {
+    this.userId = userId;
+  }
+
   public String getUsername() {
     return username;
+  }
+
+  public void setUsername(String username) {
+    this.username = username;
   }
 
   public String getMessage() {
     return message;
   }
 
-  public Messagetype getType() {
-    return type;
+  public void setMessage(String message) {
+    this.message = message;
+  }
+
+  public Messagetype getMessageType() {
+    return messageType;
+  }
+
+  public void setMessageType(Messagetype messageType) {
+    this.messageType = messageType;
   }
 
   public String getTimestamp() {
     return timestamp;
+  }
+
+  public void setTimestamp(String timestamp) {
+    this.timestamp = timestamp;
   }
 }

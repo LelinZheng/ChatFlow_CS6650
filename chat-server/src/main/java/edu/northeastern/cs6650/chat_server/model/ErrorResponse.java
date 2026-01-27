@@ -7,8 +7,8 @@ public class ErrorResponse {
   private String message;
   private List<String> details;
 
-  public ErrorResponse(String status, String errorCode, String message, List<String> details) {
-    this.status = status;
+  public ErrorResponse(String errorCode, String message, List<String> details) {
+    this.status = "ERROR";
     this.errorCode = errorCode;
     this.message = message;
     this.details = details;
