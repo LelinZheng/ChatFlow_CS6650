@@ -34,6 +34,10 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
+
+# ===== EC2 =====
+.pem
+
 # ===== VS Code =====
 .vscode/
 

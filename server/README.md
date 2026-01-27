@@ -14,7 +14,7 @@ This server serves as the foundation for a scalable chat system that will be exp
 - Stateless, thread-safe message handling
 - Health check REST endpoint
 - Built using **Spring WebSocket**
-- Ready for deployment on AWS EC2 (free tier)
+- Deployed on AWS EC2 
 
 ---
 
@@ -171,19 +171,16 @@ Example message:
 ---
 
 ## Deployment (AWS EC2)
+
 - Instance type: `t2.micro`
-
 - Region: `us-west-2`
-
+- OS: Amazon Linux
 - Security Group:
-
-    - TCP **8080** (server)
-
-    - TCP **22** (SSH)
-
-- Java 21 installed
-
-- Server runs as a standalone JAR using `nohup`, `screen`, or `systemd`
+  - TCP **8080** (application)
+  - TCP **22** (SSH)
+- Java 21 (Amazon Corretto)
+- Application packaged as a standalone Spring Boot JAR
+- Service managed using `systemd` for automatic restart and persistence across reboots
 
 ---
 ### Notes on Room Handling
