@@ -35,8 +35,8 @@ build/
 !**/src/test/**/build/
 
 
-# ===== EC2 =====
-.pem
+# ===== PEM keys =====
+*.pem
 
 # ===== VS Code =====
 .vscode/
