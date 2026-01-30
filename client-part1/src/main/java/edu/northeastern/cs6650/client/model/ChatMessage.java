@@ -1,6 +1,7 @@
 package edu.northeastern.cs6650.client.model;
 
 public class ChatMessage {
+  private String messageId;
   private String userId;
   private String username;
   private String message;
@@ -57,5 +58,13 @@ public class ChatMessage {
 
   public void setTimestamp(String timestamp) {
     this.timestamp = timestamp;
+  }
+
+  public String getMessageId() {
+    return messageId;
+  }
+
+  public void setMessageId(String messageId) {
+    this.messageId = messageId;
   }
 }
