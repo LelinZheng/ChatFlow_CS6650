@@ -1,17 +1,17 @@
-package edu.northeastern.cs6650.client.core;
+package edu.northeastern.cs6650.client.worker;
 
 import edu.northeastern.cs6650.client.model.ChatMessage;
-import edu.northeastern.cs6650.client.util.MessageProducer;
+import edu.northeastern.cs6650.client.util.MessageFactory;
 import java.util.concurrent.BlockingQueue;
 
 public class MessageGenerator implements Runnable{
   private BlockingQueue<ChatMessage> messageQueue;
   private int messageCount;
-  private MessageProducer producer;
+  private final MessageFactory producer;
   public MessageGenerator(BlockingQueue<ChatMessage> messageQueue, int messageCount) {
     this.messageQueue = messageQueue;
     this.messageCount = messageCount;
-    this.producer = new MessageProducer();
+    this.producer = new MessageFactory();
   }
 
   @Override

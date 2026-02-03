@@ -5,7 +5,7 @@ import edu.northeastern.cs6650.client.model.MessageType;
 import java.time.Instant;
 import java.util.List;
 
-public class MessageProducer {
+public class MessageFactory {
   private static final Integer USER_ID_MIN = 1;
   private static final Integer USER_ID_MAX = 100000;
 
@@ -72,6 +72,8 @@ public class MessageProducer {
   private static final Integer MESSAGE_TYPE_TEXT = 90; // 90% TEXT, 5% JOIN, 5% LEAVE
   private static final Integer MESSAGE_TYPE_JOIN = 95;
   private static final Integer MESSAGE_TYPE_LEAVE = 100;
+  private static final int ROOM_ID_MIN = 1;
+  private static final int ROOM_ID_MAX = 20;
   private final RandomGenerator randomGenerator = new RandomGenerator();
 
   public ChatMessage createMessage(){
@@ -84,6 +86,7 @@ public class MessageProducer {
     message.setUsername(USERNAME_PREFIX + message.getUserId());
     message.setMessageType(determineMessageType());
     message.setTimestamp(Instant.now().toString());
+    message.setRoomId(randomGenerator.generateRandomInteger(ROOM_ID_MIN, ROOM_ID_MAX));
 
     return message;
   }
