@@ -88,6 +88,12 @@ public class MessageProducer {
     return message;
   }
 
+  public ChatMessage createMessage(MessageType forcedType) {
+    ChatMessage message = createMessage();
+    message.setMessageType(forcedType);
+    return message;
+  }
+
   private MessageType determineMessageType() {
     int rand = randomGenerator.
         generateRandomInteger(MESSAGE_TYPE_RANGE_START, MESSAGE_TYPE_LEAVE - 1);
