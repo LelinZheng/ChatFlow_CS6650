@@ -1,26 +1,30 @@
-package edu.northeastern.cs6650.client.core;
+package edu.northeastern.cs6650.client.worker;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import edu.northeastern.cs6650.client.model.ChatMessage;
 import java.net.URI;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-public class MessengerSender implements Runnable {
+public class MessageSender implements Runnable {
 
   private final BlockingQueue<ChatMessage> queue;
   private final WebSocketClient client;
   private final int maxToSend;
-  private static final ObjectMapper ObjectMapper = new ObjectMapper();
+  private static final ObjectMapper MAPPER = new ObjectMapper();
+  private final CountDownLatch echoLatch;
 
   private int sentOk = 0;
   private int sentFailed = 0;
 
-  public MessengerSender(BlockingQueue<ChatMessage> queue, URI serverUri, int maxToSend) {
+  public MessageSender(BlockingQueue<ChatMessage> queue, URI serverUri, int maxToSend) {
     this.queue = queue;
     this.maxToSend = maxToSend;
+    this.echoLatch = new CountDownLatch(maxToSend);
 
     this.client = new WebSocketClient(serverUri) {
 
@@ -31,7 +35,8 @@ public class MessengerSender implements Runnable {
 
       @Override
       public void onMessage(String s) {
-
+        echoLatch.countDown();
+        System.out.println(Thread.currentThread().getName() + " <- " + s);
       }
 
       @Override
@@ -68,6 +73,8 @@ public class MessengerSender implements Runnable {
       Thread.currentThread().interrupt();
     } finally {
       try {
+        // 2 seconds of maximum wait time if echo dont fully arrive
+        echoLatch.await(2, TimeUnit.SECONDS);
         client.closeBlocking();
       } catch (InterruptedException ignored) {
         Thread.currentThread().interrupt();
@@ -105,7 +112,7 @@ public class MessengerSender implements Runnable {
   }
 
   private String toJson(ChatMessage msg) throws JsonProcessingException {
-    String msgStr = ObjectMapper.writeValueAsString(msg);
+    String msgStr = MAPPER.writeValueAsString(msg);
     return msgStr;
   }
 }
