@@ -2,7 +2,7 @@ package edu.northeastern.cs6650.client.loadtest;
 
 import edu.northeastern.cs6650.client.model.ChatMessage;
 import edu.northeastern.cs6650.client.worker.MessageGenerator;
-import edu.northeastern.cs6650.client.worker.MessageSender;
+import edu.northeastern.cs6650.client.ws.ConnectionWorker;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,7 +38,7 @@ public class LoadTestRunner {
     BlockingQueue<ChatMessage> warmupQueue = new ArrayBlockingQueue<>(queueCapacity);
     Thread generator = new Thread(new MessageGenerator(warmupQueue, warmupTotalMessages));
 
-    List<MessageSender> senderTasks = new ArrayList<>();
+    List<ConnectionWorker> senderTasks = new ArrayList<>();
     List<Future<?>> futures = new ArrayList<>();
 
     long start = System.nanoTime();
@@ -48,11 +48,13 @@ public class LoadTestRunner {
     for (int i = 0; i < warmupThread; i++) {
 
       // Have all messages send to room1 for simplicity
+      // maxRetries=5, echoTimeoutMs=5000ms
       URI fullUri = baseUri.resolve("1");
-      MessageSender sender = new MessageSender(warmupQueue, fullUri, warmupMessagesPerThread);
-      senderTasks.add(sender);
-
-      futures.add(pool.submit(sender));
+      ConnectionWorker worker = new ConnectionWorker(
+          warmupQueue, fullUri, warmupMessagesPerThread,
+          5, 5000);
+      senderTasks.add(worker);
+      futures.add(pool.submit(worker));
     }
 
     try {
@@ -70,8 +72,8 @@ public class LoadTestRunner {
 
     long end = System.nanoTime();
 
-    int ok = senderTasks.stream().mapToInt(MessageSender::getSentOk).sum();
-    int failed = senderTasks.stream().mapToInt(MessageSender::getSentFailed).sum();
+    int ok = senderTasks.stream().mapToInt(ConnectionWorker::getSentOk).sum();
+    int failed = senderTasks.stream().mapToInt(ConnectionWorker::getSentFailed).sum();
     double durationSeconds = (end - start) / 1_000_000_000.0;
     double throughput = ok / durationSeconds;
 
