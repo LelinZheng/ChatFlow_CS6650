@@ -3,6 +3,7 @@ package edu.northeastern.cs6650.client.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public class ChatMessage {
+  @JsonIgnore
   private String messageId;
   private String userId;
   private String username;
