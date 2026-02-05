@@ -1,4 +1,4 @@
-package edu.northeastern.cs6650.client.worker;
+package edu.northeastern.cs6650.client.generator;
 
 import edu.northeastern.cs6650.client.model.ChatMessage;
 import edu.northeastern.cs6650.client.util.MessageFactory;
