@@ -14,6 +14,23 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
+/**
+ * Represents a single sender thread responsible for managing one persistent
+ * WebSocket connection.
+ *
+ * <p>Each {@code ConnectionWorker} owns exactly one WebSocket connection and
+ * sends messages sequentially using a send-then-wait-for-echo protocol.
+ * This guarantees at most one in-flight message per connection and enables
+ * accurate latency measurement.</p>
+ *
+ * <p>The worker supports two termination modes:
+ * <ul>
+ *   <li>{@link StopMode#FIXED_COUNT} – send a fixed number of messages (warmup)</li>
+ *   <li>{@link StopMode#POISON_PILL} – run until an explicit termination signal
+ *       is received (main phase)</li>
+ * </ul>
+ * </p>
+ */
 public class ConnectionWorker implements Runnable {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
@@ -36,6 +53,20 @@ public class ConnectionWorker implements Runnable {
   private final int maxRetries;
   private final long echoTimeoutMs;
 
+  /**
+   * Creates a connection worker that owns a single persistent WebSocket connection
+   * and consumes messages from the provided queue.
+   *
+   * <p>This constructor is typically used for {@link StopMode#FIXED_COUNT} mode,
+   * where the worker sends exactly {@code maxToSend} messages before terminating.</p>
+   *
+   * @param outbound queue from which messages are consumed
+   * @param serverUri WebSocket endpoint URI (e.g., {@code ws://host:port/chat/{roomId}})
+   * @param maxRetries maximum number of send/echo attempts per message before counting it as failed
+   * @param echoTimeoutMs maximum time to wait for an echo acknowledgement per message (milliseconds)
+   * @param stopMode worker termination mode (fixed-count or poison-pill)
+   * @param maxToSend number of messages to send when using {@link StopMode#FIXED_COUNT}
+   */
   public ConnectionWorker(BlockingQueue<ChatMessage> outbound,
       URI serverUri,
       int maxRetries,
@@ -51,6 +82,20 @@ public class ConnectionWorker implements Runnable {
     this.client = buildClient(serverUri);
   }
 
+  /**
+   * Creates a connection worker that owns a single persistent WebSocket connection
+   * and consumes messages from the provided queue until a poison-pill message is received.
+   *
+   * <p>This constructor is typically used for {@link StopMode#POISON_PILL} mode,
+   * which is required when messages are routed randomly and the exact per-worker
+   * message count is not known in advance.</p>
+   *
+   * @param outbound queue from which messages are consumed
+   * @param serverUri WebSocket endpoint URI (e.g., {@code ws://host:port/chat/{roomId}})
+   * @param maxRetries maximum number of send/echo attempts per message before counting it as failed
+   * @param echoTimeoutMs maximum time to wait for an echo acknowledgement per message (milliseconds)
+   * @param stopMode worker termination mode (should be {@link StopMode#POISON_PILL})
+   */
   public ConnectionWorker(BlockingQueue<ChatMessage> outbound,
       URI serverUri,
       int maxRetries,
@@ -68,9 +113,7 @@ public class ConnectionWorker implements Runnable {
     return new WebSocketClient(uri) {
 
       @Override
-      public void onOpen(ServerHandshake serverHandshake) {
-        System.out.println(Thread.currentThread().getName() + " connected to " + uri);
-      }
+      public void onOpen(ServerHandshake serverHandshake) { }
 
       @Override
       public void onMessage(String message) {
@@ -82,9 +125,7 @@ public class ConnectionWorker implements Runnable {
       }
 
       @Override
-      public void onClose(int i, String s, boolean b) {
-        System.out.println(Thread.currentThread().getName() + " closed. " + s);
-      }
+      public void onClose(int i, String s, boolean b) { }
 
       @Override
       public void onError(Exception e) {
@@ -92,22 +133,58 @@ public class ConnectionWorker implements Runnable {
     };
   }
 
+  /**
+   * Get number of successfully sent messages.
+   * @return number of successful sends
+   */
   public int getSentOk() {
     return sentOk.get();
   }
 
+  /**
+   * Get number of failed messages.
+   * @return number of failed sends
+   */
   public int getSentFailed() {
     return sentFailed.get();
   }
 
+  /**
+   * Get number of reconnections performed.
+   * @return number of reconnects
+   */
   public int getReconnects() {
     return reconnects.get();
   }
 
+  /**
+   * Get total latency sum in nanoseconds for all successful messages.
+   * @return latency sum in nanoseconds
+   */
   public long getLatencySumNanos() {
     return latencySumNanos.get();
   }
 
+  /**
+   * Executes the main worker loop for this connection.
+   *
+   * <p>The worker establishes a persistent WebSocket connection and then consumes
+   * messages from its assigned outbound queue. Messages are sent sequentially
+   * using a send-then-wait-for-echo protocol to ensure at most one in-flight
+   * message per connection.</p>
+   *
+   * <p>Termination behavior depends on the configured {@link StopMode}:
+   * <ul>
+   *   <li>{@link StopMode#FIXED_COUNT}: send exactly {@code maxToSend} messages
+   *       and then terminate (used during warmup)</li>
+   *   <li>{@link StopMode#POISON_PILL}: continue processing messages until a
+   *       poison-pill message is received (used during the main phase)</li>
+   * </ul>
+   * </p>
+   *
+   * <p>If the thread is interrupted, execution stops and the WebSocket connection
+   * is closed.</p>
+   */
   @Override
   public void run() {
     try {
@@ -134,6 +211,16 @@ public class ConnectionWorker implements Runnable {
     }
   }
 
+  /**
+   * Establishes the WebSocket connection if it is not already open.
+   *
+   * <p>This method blocks until the WebSocket handshake completes successfully.
+   * It is safe to call multiple times; a connection attempt is only made when the
+   * client is not already open.</p>
+   *
+   * @throws InterruptedException if the current thread is interrupted while
+   *                              waiting for the connection to open
+   */
   private void connectBlocking() throws InterruptedException {
     if (client == null)
       client = buildClient(serverUri);
@@ -142,6 +229,23 @@ public class ConnectionWorker implements Runnable {
     }
   }
 
+  /**
+   * Sends a single message over the WebSocket connection and waits for an echo
+   * acknowledgement, retrying on failure.
+   *
+   * <p>The method enforces strict send ordering by waiting for an echo response
+   * before returning. If no echo is received within {@code echoTimeoutMs}, or if
+   * a send error occurs, the connection is re-established and the send is retried
+   * with exponential backoff.</p>
+   *
+   * <p>Latency is measured as the time between send initiation and echo receipt
+   * and accumulated for later analysis.</p>
+   *
+   * @param message the message to send
+   * @return {@code true} if the message was acknowledged by the server;
+   *         {@code false} if all retry attempts failed
+   * @throws InterruptedException if the thread is interrupted while waiting
+   */
   private boolean sendWaitEchoWithRetries(ChatMessage message) throws InterruptedException {
     long backoffMs = 50;
 
@@ -176,6 +280,14 @@ public class ConnectionWorker implements Runnable {
     return false;
   }
 
+  /**
+   * Ensures that a valid, open WebSocket connection exists.
+   *
+   * <p>If the client is {@code null} or the connection is closed, this method
+   * establishes a new connection before returning.</p>
+   *
+   * @throws InterruptedException if the thread is interrupted while reconnecting
+   */
   private void ensureConnected() throws InterruptedException {
     if (client == null) {
       client = buildClient(serverUri);
@@ -188,6 +300,14 @@ public class ConnectionWorker implements Runnable {
     }
   }
 
+  /**
+   * Safely closes the current WebSocket connection and establishes a new one.
+   *
+   * <p>This method increments the reconnect counter and rebuilds the underlying
+   * WebSocket client to avoid stale state or listener issues.</p>
+   *
+   * @throws InterruptedException if the thread is interrupted while reconnecting
+   */
   private void safeReconnect() throws InterruptedException {
     reconnects.incrementAndGet();
     try {
@@ -200,6 +320,9 @@ public class ConnectionWorker implements Runnable {
     client.reconnectBlocking();
   }
 
+  /**
+   * Safely closes the current WebSocket connection.
+   */
   private void safeClose() {
     try {
       if (client != null)
@@ -208,6 +331,16 @@ public class ConnectionWorker implements Runnable {
     }
   }
 
+  /**
+   * Serializes a {@link ChatMessage} to its JSON representation.
+   *
+   * <p>Fields marked with {@code @JsonIgnore} are excluded from the serialized
+   * payload.</p>
+   *
+   * @param msg the message to serialize
+   * @return JSON string representation of the message
+   * @throws JsonProcessingException if serialization fails
+   */
   private String toJson(ChatMessage msg) throws JsonProcessingException {
     return MAPPER.writeValueAsString(msg);
   }

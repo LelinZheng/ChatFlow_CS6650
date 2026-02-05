@@ -5,6 +5,16 @@ import edu.northeastern.cs6650.client.model.MessageType;
 import java.time.Instant;
 import java.util.List;
 
+/**
+ * Factory responsible for creating randomized {@link ChatMessage} instances.
+ *
+ * <p>Generated messages conform to the assignment specification, including
+ * randomized user IDs, usernames, message content, message types, and
+ * timestamps.</p>
+ *
+ * <p>This class encapsulates all message construction logic so that generation
+ * behavior can be modified independently of the load test execution.</p>
+ */
 public class MessageFactory {
   private static final Integer USER_ID_MIN = 1;
   private static final Integer USER_ID_MAX = 100000;
@@ -74,6 +84,10 @@ public class MessageFactory {
   private static final Integer MESSAGE_TYPE_LEAVE = 100;
   private final RandomGenerator randomGenerator = new RandomGenerator();
 
+  /**
+   * Create a randomized ChatMessage instance.
+   * @return the generated ChatMessage
+   */
   public ChatMessage createMessage(){
     ChatMessage message = new ChatMessage();
     message.setMessageId(randomGenerator.generateRandomMessageId());
@@ -88,12 +102,21 @@ public class MessageFactory {
     return message;
   }
 
+  /**
+   * Create a randomized ChatMessage instance with a forced message type.
+   * @param forcedType the message type to set
+   * @return the generated ChatMessage
+   */
   public ChatMessage createMessage(MessageType forcedType) {
     ChatMessage message = createMessage();
     message.setMessageType(forcedType);
     return message;
   }
 
+  /**
+   * Determine message type based on predefined probabilities.
+   * @return the selected MessageType
+   */
   private MessageType determineMessageType() {
     int rand = randomGenerator.
         generateRandomInteger(MESSAGE_TYPE_RANGE_START, MESSAGE_TYPE_LEAVE - 1);
