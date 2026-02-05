@@ -5,6 +5,7 @@ import static edu.northeastern.cs6650.client.ws.StopMode.POISON_PILL;
 
 import edu.northeastern.cs6650.client.metrics.CsvMetricsWriter;
 import edu.northeastern.cs6650.client.metrics.MetricRecord;
+import edu.northeastern.cs6650.client.metrics.MetricsAnalyzer;
 import edu.northeastern.cs6650.client.model.ChatMessage;
 import edu.northeastern.cs6650.client.generator.MainPhaseMessageGenerator;
 import edu.northeastern.cs6650.client.generator.WarmupMessageGenerator;
@@ -255,6 +256,20 @@ public class LoadTestRunner {
    * <p>This method is intended to consolidate warmup and main phase metrics
    * (throughput, failures, latency statistics, etc.) into a single report.</p>
    */
-  public void printSummary() { }
+  public void printSummary() {
+    System.out.println("Load test summary:");
+    System.out.println("Main phase metrics to be aggregated here.");
+
+    Path outDir = Paths.get("..", "client-part2", "results");
+    Path metricsCsv = outDir.resolve("main_metrics.csv");
+    Path bucketsCsv = outDir.resolve("throughput_10s.csv");
+
+    try {
+      new MetricsAnalyzer().analyzeAndPrint(metricsCsv, bucketsCsv, true);
+    } catch (Exception e) {
+      System.err.println("Failed to analyze metrics: " + e.getMessage());
+      e.printStackTrace();
+    }
+  }
 
 }
