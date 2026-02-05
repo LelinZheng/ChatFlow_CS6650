@@ -1,5 +1,7 @@
 package edu.northeastern.cs6650.client.ws;
 
+import static edu.northeastern.cs6650.client.ws.StopMode.FIXED_COUNT;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.northeastern.cs6650.client.model.ChatMessage;
@@ -18,7 +20,8 @@ public class ConnectionWorker implements Runnable {
 
   private final BlockingQueue<ChatMessage> outbound;
   private final URI serverUri;
-  private final int maxToSend;
+  private int maxToSend = 0;
+  private final StopMode mode;
 
   // Echo mailbox: 1-slot handoff for "send -> wait echo"
   private final BlockingQueue<String> echoMailbox = new ArrayBlockingQueue<>(1);
@@ -35,15 +38,29 @@ public class ConnectionWorker implements Runnable {
 
   public ConnectionWorker(BlockingQueue<ChatMessage> outbound,
       URI serverUri,
-      int maxToSend,
       int maxRetries,
-      long echoTimeoutMs) {
+      long echoTimeoutMs,
+      StopMode stopMode,
+      int maxToSend) {
     this.outbound = outbound;
     this.serverUri = serverUri;
-    this.maxToSend = maxToSend;
     this.maxRetries = maxRetries;
     this.echoTimeoutMs = echoTimeoutMs;
+    this.maxToSend = maxToSend;
+    this.mode = stopMode;
+    this.client = buildClient(serverUri);
+  }
 
+  public ConnectionWorker(BlockingQueue<ChatMessage> outbound,
+      URI serverUri,
+      int maxRetries,
+      long echoTimeoutMs,
+      StopMode stopMode) {
+    this.outbound = outbound;
+    this.serverUri = serverUri;
+    this.maxRetries = maxRetries;
+    this.echoTimeoutMs = echoTimeoutMs;
+    this.mode = stopMode;
     this.client = buildClient(serverUri);
   }
 
@@ -95,14 +112,20 @@ public class ConnectionWorker implements Runnable {
   public void run() {
     try {
       connectBlocking();
-      for (int i = 0; i < maxToSend; i++) {
-        ChatMessage message = outbound.take();
+      if (mode == FIXED_COUNT) {
+        for (int i = 0; i < maxToSend; i++) {
+          ChatMessage msg = outbound.take();
+          boolean ok = sendWaitEchoWithRetries(msg);
+          if (ok) sentOk.incrementAndGet(); else sentFailed.incrementAndGet();
+        }
+      } else { // POISON_PILL
+        while (true) {
+          ChatMessage msg = outbound.take();
+          if (msg.isPoison()) break;
 
-        boolean ok = sendWaitEchoWithRetries(message);
-        if (ok)
-          sentOk.incrementAndGet();
-        else
-          sentFailed.incrementAndGet();
+          boolean ok = sendWaitEchoWithRetries(msg);
+          if (ok) sentOk.incrementAndGet(); else sentFailed.incrementAndGet();
+        }
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

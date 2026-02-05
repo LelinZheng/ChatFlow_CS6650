@@ -49,6 +49,14 @@ public class MainPhaseMessageGenerator implements Runnable {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
+    // Send poison pills to all workers to signal completion
+    for (int w = 0; w < workerQueues.length; w++) {
+      try {
+        workerQueues[w].put(ChatMessage.poison());
+      } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+      }
+    }
   }
 
   private int pickRoomId() {

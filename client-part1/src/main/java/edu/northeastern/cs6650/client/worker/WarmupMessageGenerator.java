@@ -22,6 +22,7 @@ public class WarmupMessageGenerator implements Runnable{
         msg.setRoomId(1); // all warmup messages go to room 1
         messageQueue.put(msg); // blocks if queue is full
       }
+      messageQueue.put(ChatMessage.poison()); // signal completion
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
