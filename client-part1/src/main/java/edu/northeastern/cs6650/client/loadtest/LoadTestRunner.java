@@ -4,8 +4,8 @@ import static edu.northeastern.cs6650.client.ws.StopMode.FIXED_COUNT;
 import static edu.northeastern.cs6650.client.ws.StopMode.POISON_PILL;
 
 import edu.northeastern.cs6650.client.model.ChatMessage;
-import edu.northeastern.cs6650.client.worker.MainPhaseMessageGenerator;
-import edu.northeastern.cs6650.client.worker.WarmupMessageGenerator;
+import edu.northeastern.cs6650.client.generator.MainPhaseMessageGenerator;
+import edu.northeastern.cs6650.client.generator.WarmupMessageGenerator;
 import edu.northeastern.cs6650.client.ws.ConnectionWorker;
 import java.net.URI;
 import java.util.ArrayList;
@@ -204,11 +204,17 @@ public class LoadTestRunner {
     int failed = senderTasks.stream().mapToInt(ConnectionWorker::getSentFailed).sum();
     double durationSeconds = (end - start) / 1_000_000_000.0;
     double throughput = ok / durationSeconds;
+    int totalReconnects =
+        senderTasks.stream().mapToInt(ConnectionWorker::getReconnects).sum();
+
+    int totalConnections = senderTasks.size();
 
     System.out.println("Main phase done.");
     System.out.println("OK=" + ok + " failed=" + failed);
     System.out.println("timeSec=" + durationSeconds);
     System.out.println("throughput msg/s=" + throughput);
+    System.out.println("connections=" + totalConnections);
+    System.out.println("reconnections=" + totalReconnects);
 
   }
 
