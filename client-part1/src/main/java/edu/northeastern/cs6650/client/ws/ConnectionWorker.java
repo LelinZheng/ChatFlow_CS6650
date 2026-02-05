@@ -4,6 +4,7 @@ import static edu.northeastern.cs6650.client.ws.StopMode.FIXED_COUNT;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.northeastern.cs6650.client.metrics.MetricRecord;
 import edu.northeastern.cs6650.client.model.ChatMessage;
 import java.net.URI;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -53,6 +54,8 @@ public class ConnectionWorker implements Runnable {
   private final int maxRetries;
   private final long echoTimeoutMs;
 
+  BlockingQueue<MetricRecord> metricsQueue;
+
   /**
    * Creates a connection worker that owns a single persistent WebSocket connection
    * and consumes messages from the provided queue.
@@ -66,13 +69,15 @@ public class ConnectionWorker implements Runnable {
    * @param echoTimeoutMs maximum time to wait for an echo acknowledgement per message (milliseconds)
    * @param stopMode worker termination mode (fixed-count or poison-pill)
    * @param maxToSend number of messages to send when using {@link StopMode#FIXED_COUNT}
+   * @param metricsQueue queue to which metric records are published
    */
   public ConnectionWorker(BlockingQueue<ChatMessage> outbound,
       URI serverUri,
       int maxRetries,
       long echoTimeoutMs,
       StopMode stopMode,
-      int maxToSend) {
+      int maxToSend,
+      BlockingQueue<MetricRecord> metricsQueue) {
     this.outbound = outbound;
     this.serverUri = serverUri;
     this.maxRetries = maxRetries;
@@ -80,6 +85,7 @@ public class ConnectionWorker implements Runnable {
     this.maxToSend = maxToSend;
     this.mode = stopMode;
     this.client = buildClient(serverUri);
+    this.metricsQueue = metricsQueue;
   }
 
   /**
@@ -95,18 +101,21 @@ public class ConnectionWorker implements Runnable {
    * @param maxRetries maximum number of send/echo attempts per message before counting it as failed
    * @param echoTimeoutMs maximum time to wait for an echo acknowledgement per message (milliseconds)
    * @param stopMode worker termination mode (should be {@link StopMode#POISON_PILL})
+   * @param metricsQueue queue to which metric records are published
    */
   public ConnectionWorker(BlockingQueue<ChatMessage> outbound,
       URI serverUri,
       int maxRetries,
       long echoTimeoutMs,
-      StopMode stopMode) {
+      StopMode stopMode,
+      BlockingQueue<MetricRecord> metricsQueue) {
     this.outbound = outbound;
     this.serverUri = serverUri;
     this.maxRetries = maxRetries;
     this.echoTimeoutMs = echoTimeoutMs;
     this.mode = stopMode;
     this.client = buildClient(serverUri);
+    this.metricsQueue = metricsQueue;
   }
 
   private WebSocketClient buildClient(URI uri) {
@@ -239,7 +248,7 @@ public class ConnectionWorker implements Runnable {
    * with exponential backoff.</p>
    *
    * <p>Latency is measured as the time between send initiation and echo receipt
-   * and accumulated for later analysis.</p>
+   * and accumulated for later analysis, saved to a {@code metricsQueue}</p>
    *
    * @param message the message to send
    * @return {@code true} if the message was acknowledged by the server;
@@ -251,6 +260,7 @@ public class ConnectionWorker implements Runnable {
 
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       long t0 = System.nanoTime();
+      long sendTsMillis = System.currentTimeMillis();
       try {
         ensureConnected();
         echoMailbox.clear();
@@ -262,13 +272,40 @@ public class ConnectionWorker implements Runnable {
         if (echo != null) {
           long t1 = System.nanoTime();
           latencySumNanos.addAndGet(t1 - t0);
+          long latencyMillis = TimeUnit.NANOSECONDS.toMillis(t1 - t0);
+          metricsQueue.put(
+              new MetricRecord(
+                  sendTsMillis,
+                  message.getMessageType(),
+                  latencyMillis,
+                  "OK",
+                  message.getRoomId()
+              )
+          );
           return true;
         }
-
+        if (attempt == maxRetries) {
+          metricsQueue.put(new MetricRecord(
+              sendTsMillis,
+              message.getMessageType(),
+              -1,
+              "TIMEOUT",
+              message.getRoomId()
+          ));
+          return false;
+        }
         safeReconnect();
       } catch (Exception e) {
-        if (attempt == maxRetries)
+        if (attempt == maxRetries) {
+          metricsQueue.put(new MetricRecord(
+              sendTsMillis,
+              message.getMessageType(),
+              -1,
+              "FAILED",
+              message.getRoomId()
+          ));
           return false;
+        }
         safeReconnect();
       }
 
