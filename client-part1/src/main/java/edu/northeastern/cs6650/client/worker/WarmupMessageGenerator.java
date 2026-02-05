@@ -4,11 +4,11 @@ import edu.northeastern.cs6650.client.model.ChatMessage;
 import edu.northeastern.cs6650.client.util.MessageFactory;
 import java.util.concurrent.BlockingQueue;
 
-public class MessageGenerator implements Runnable{
+public class WarmupMessageGenerator implements Runnable{
   private BlockingQueue<ChatMessage> messageQueue;
   private int messageCount;
   private final MessageFactory producer;
-  public MessageGenerator(BlockingQueue<ChatMessage> messageQueue, int messageCount) {
+  public WarmupMessageGenerator(BlockingQueue<ChatMessage> messageQueue, int messageCount) {
     this.messageQueue = messageQueue;
     this.messageCount = messageCount;
     this.producer = new MessageFactory();
@@ -18,7 +18,9 @@ public class MessageGenerator implements Runnable{
   public void run() {
     try {
       for (int i = 0; i < messageCount; i++) {
-        messageQueue.put(producer.createMessage()); // blocks if queue is full
+        ChatMessage msg = producer.createMessage();
+        msg.setRoomId(1); // all warmup messages go to room 1
+        messageQueue.put(msg); // blocks if queue is full
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
