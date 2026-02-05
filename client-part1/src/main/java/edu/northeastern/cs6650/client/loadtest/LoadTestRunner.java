@@ -1,5 +1,8 @@
 package edu.northeastern.cs6650.client.loadtest;
 
+import static edu.northeastern.cs6650.client.ws.StopMode.FIXED_COUNT;
+import static edu.northeastern.cs6650.client.ws.StopMode.POISON_PILL;
+
 import edu.northeastern.cs6650.client.model.ChatMessage;
 import edu.northeastern.cs6650.client.worker.MainPhaseMessageGenerator;
 import edu.northeastern.cs6650.client.worker.WarmupMessageGenerator;
@@ -55,8 +58,9 @@ public class LoadTestRunner {
       // maxRetries=5, echoTimeoutMs=5000ms
       URI fullUri = baseUri.resolve("1");
       ConnectionWorker worker = new ConnectionWorker(
-          warmupQueue, fullUri, warmupMessagesPerThread,
-          5, 5000);
+          warmupQueue, fullUri,
+          5, 5000,
+          FIXED_COUNT, warmupMessagesPerThread);
       senderTasks.add(worker);
       futures.add(pool.submit(worker));
     }
@@ -92,8 +96,6 @@ public class LoadTestRunner {
     int rooms = 20;
     int mainPhaseThread = connPerRoom * rooms;
     int totalMsg = 500_000;
-    int base = totalMsg / mainPhaseThread;
-    int rem = totalMsg % mainPhaseThread;
     int queueCapacity = 3000;
 
     AtomicInteger idx = new AtomicInteger(0);
@@ -122,10 +124,10 @@ public class LoadTestRunner {
     for (int i = 0; i < mainPhaseThread; i++) {
       int roomId = (i / connPerRoom) + 1;
       URI fullUri = baseUri.resolve(String.valueOf(roomId));
-      int expectedForThisWorker = base + (i < rem ? 1 : 0);
       ConnectionWorker worker = new ConnectionWorker(
-          workerQueues[i], fullUri, expectedForThisWorker,
-          5, 5000);
+          workerQueues[i], fullUri,
+          5, 5000,
+          POISON_PILL);
       senderTasks.add(worker);
       futures.add(pool.submit(worker));
     }

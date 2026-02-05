@@ -81,4 +81,14 @@ public class ChatMessage {
   public void setRoomId(int roomId) {
     this.roomId = roomId;
   }
+
+  public boolean isPoison() {
+    return "POISON".equals(messageId);
+  }
+
+  public static ChatMessage poison() {
+    ChatMessage m = new ChatMessage();
+    m.messageId = "POISON";
+    return m;
+  }
 }
