@@ -3,11 +3,15 @@ package edu.northeastern.cs6650.client.loadtest;
 import static edu.northeastern.cs6650.client.ws.StopMode.FIXED_COUNT;
 import static edu.northeastern.cs6650.client.ws.StopMode.POISON_PILL;
 
+import edu.northeastern.cs6650.client.metrics.CsvMetricsWriter;
+import edu.northeastern.cs6650.client.metrics.MetricRecord;
 import edu.northeastern.cs6650.client.model.ChatMessage;
 import edu.northeastern.cs6650.client.generator.MainPhaseMessageGenerator;
 import edu.northeastern.cs6650.client.generator.WarmupMessageGenerator;
 import edu.northeastern.cs6650.client.ws.ConnectionWorker;
 import java.net.URI;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ArrayBlockingQueue;
@@ -83,6 +87,13 @@ public class LoadTestRunner {
     List<ConnectionWorker> senderTasks = new ArrayList<>();
     List<Future<?>> futures = new ArrayList<>();
 
+    BlockingQueue<MetricRecord> metricsQueue = new ArrayBlockingQueue<>(50_000);
+    Path outDir = Paths.get("..", "client-part2", "results");
+    Path csvPath = outDir.resolve("warmup_metrics.csv");
+    Thread metricsWriter = new Thread(
+        new CsvMetricsWriter(metricsQueue, csvPath), "metrics-writer");
+    metricsWriter.start();
+
     long start = System.nanoTime();
 
     generator.start();
@@ -95,7 +106,8 @@ public class LoadTestRunner {
       ConnectionWorker worker = new ConnectionWorker(
           warmupQueue, fullUri,
           5, 5000,
-          FIXED_COUNT, warmupMessagesPerThread);
+          FIXED_COUNT, warmupMessagesPerThread,
+          metricsQueue);
       senderTasks.add(worker);
       futures.add(pool.submit(worker));
     }
@@ -111,6 +123,12 @@ public class LoadTestRunner {
       e.getCause().printStackTrace();
     } finally {
       pool.shutdown();
+      try {
+        metricsQueue.put(MetricRecord.poison());
+        metricsWriter.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
 
     long end = System.nanoTime();
@@ -170,6 +188,13 @@ public class LoadTestRunner {
     List<ConnectionWorker> senderTasks = new ArrayList<>();
     List<Future<?>> futures = new ArrayList<>();
 
+    BlockingQueue<MetricRecord> metricsQueue = new ArrayBlockingQueue<>(50_000);
+    Path outDir = Paths.get("..", "client-part2", "results");
+    Path csvPath = outDir.resolve("main_metrics.csv");
+    Thread metricsWriter = new Thread(
+        new CsvMetricsWriter(metricsQueue, csvPath), "metrics-writer");
+    metricsWriter.start();
+
     long start = System.nanoTime();
 
     generator.start();
@@ -180,7 +205,7 @@ public class LoadTestRunner {
       ConnectionWorker worker = new ConnectionWorker(
           workerQueues[i], fullUri,
           5, 5000,
-          POISON_PILL);
+          POISON_PILL, metricsQueue);
       senderTasks.add(worker);
       futures.add(pool.submit(worker));
     }
@@ -196,6 +221,12 @@ public class LoadTestRunner {
       e.getCause().printStackTrace();
     } finally {
       pool.shutdown();
+      try {
+        metricsQueue.put(MetricRecord.poison());
+        metricsWriter.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
     }
 
     long end = System.nanoTime();
