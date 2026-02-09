@@ -16,8 +16,8 @@ import java.net.URI;
 public class LoadTestClient {
   public static void main(String[] args) {
     System.out.println("Load Test Client Started");
-    URI baseUri = URI.create("ws://localhost:8080/chat/");
-    // URI baseUri = URI.create("ws://ec2-34-220-155-145.us-west-2.compute.amazonaws.com:8080/chat/");
+    // URI baseUri = URI.create("ws://localhost:8080/chat/");
+    URI baseUri = URI.create("ws://ec2-35-161-30-34.us-west-2.compute.amazonaws.com:8080/chat/");
 
     LoadTestRunner runner = new LoadTestRunner(baseUri);
     runner.runWarmup();

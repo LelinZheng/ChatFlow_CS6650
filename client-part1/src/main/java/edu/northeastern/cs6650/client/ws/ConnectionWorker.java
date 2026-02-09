@@ -122,7 +122,9 @@ public class ConnectionWorker implements Runnable {
     return new WebSocketClient(uri) {
 
       @Override
-      public void onOpen(ServerHandshake serverHandshake) { }
+      public void onOpen(ServerHandshake serverHandshake) {
+        System.out.println("Connection opened: " + uri);
+      }
 
       @Override
       public void onMessage(String message) {
@@ -134,7 +136,10 @@ public class ConnectionWorker implements Runnable {
       }
 
       @Override
-      public void onClose(int i, String s, boolean b) { }
+      public void onClose(int i, String s, boolean b) {
+        System.out.println("CLOSE " + uri + " code=" + i);
+
+      }
 
       @Override
       public void onError(Exception e) {
