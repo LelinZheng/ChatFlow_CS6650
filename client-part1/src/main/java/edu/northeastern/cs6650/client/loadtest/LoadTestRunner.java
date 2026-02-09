@@ -163,7 +163,7 @@ public class LoadTestRunner {
    * runtime, and throughput for the main phase.</p>
    */
   public void runMainPhase() {
-    int connPerRoom = 2;
+    int connPerRoom = 5;
     int rooms = 20;
     int mainPhaseThread = connPerRoom * rooms;
     int totalMsg = 500_000;
@@ -265,7 +265,7 @@ public class LoadTestRunner {
     Path bucketsCsv = outDir.resolve("throughput_10s.csv");
 
     try {
-      new MetricsAnalyzer().analyzeAndPrint(metricsCsv, bucketsCsv, true);
+      new MetricsAnalyzer().analyzeAndPrint(metricsCsv, bucketsCsv);
     } catch (Exception e) {
       System.err.println("Failed to analyze metrics: " + e.getMessage());
       e.printStackTrace();

@@ -17,13 +17,12 @@ public class MetricsAnalyzer {
    * Also writes throughput-over-time buckets (10-second windows) to {@code outBucketsCsv}.
    *
    * Expected CSV headers:
-   * timestamp,messageType,latency,statusCode,roomId
+   * timestamp,messageType,latencyMs,statusCode,roomId
    *
    * @param metricsCsv metrics CSV path
    * @param outBucketsCsv output CSV path for throughput buckets (10-second)
-   * @param latencyIsNanos true if "latencyMs" column is nanoseconds; false if milliseconds
    */
-  public void analyzeAndPrint(Path metricsCsv, Path outBucketsCsv, boolean latencyIsNanos) throws Exception {
+  public void analyzeAndPrint(Path metricsCsv, Path outBucketsCsv) throws Exception {
 
     List<Long> okLatencies = new ArrayList<>(500_000);
 
@@ -77,12 +76,12 @@ public class MetricsAnalyzer {
     // ---- Latency stats (OK only) ----
     Collections.sort(okLatencies);
 
-    double meanMs = meanMs(okLatencies, latencyIsNanos);
-    double medianMs = percentileMs(okLatencies, 50, latencyIsNanos);
-    double p95Ms = percentileMs(okLatencies, 95, latencyIsNanos);
-    double p99Ms = percentileMs(okLatencies, 99, latencyIsNanos);
-    double minMs = okLatencies.isEmpty() ? 0 : toMs(okLatencies.get(0), latencyIsNanos);
-    double maxMs = okLatencies.isEmpty() ? 0 : toMs(okLatencies.get(okLatencies.size() - 1), latencyIsNanos);
+    double meanMs = meanMs(okLatencies);
+    double medianMs = percentileMs(okLatencies, 50);
+    double p95Ms = percentileMs(okLatencies, 95);
+    double p99Ms = percentileMs(okLatencies, 99);
+    double minMs = okLatencies.isEmpty() ? 0 : okLatencies.get(0);
+    double maxMs = okLatencies.isEmpty() ? 0 : okLatencies.get(okLatencies.size() - 1);
 
     double durationSec = (maxTs > minTs) ? ((maxTs - minTs) / 1000.0) : 1.0;
 
@@ -115,26 +114,24 @@ public class MetricsAnalyzer {
     System.out.println("Throughput buckets CSV: " + outBucketsCsv.toAbsolutePath());
   }
 
-  private static double toMs(long latencyRaw, boolean nanos) {
-    return nanos ? (latencyRaw / 1_000_000.0) : (double) latencyRaw;
+  private static double meanMs(List<Long> latenciesMs) {
+    if (latenciesMs.isEmpty()) return 0;
+    long sum = 0;
+    for (long v : latenciesMs) sum += v;
+    return sum / (double) latenciesMs.size();
   }
 
-  private static double meanMs(List<Long> latenciesRaw, boolean nanos) {
-    if (latenciesRaw.isEmpty()) return 0;
-    double sum = 0;
-    for (long v : latenciesRaw) sum += toMs(v, nanos);
-    return sum / latenciesRaw.size();
-  }
 
-  private static double percentileMs(List<Long> sortedLatenciesRaw, int p, boolean nanos) {
-    if (sortedLatenciesRaw.isEmpty()) return 0;
-    int n = sortedLatenciesRaw.size();
-    int idx = (int) Math.ceil((p / 100.0) * n) - 1;
+  private static double percentileMs(List<Long> sortedLatenciesMs, int p) {
+    if (sortedLatenciesMs.isEmpty()) return 0;
+    int n = sortedLatenciesMs.size();
+    int idx = (int) Math.ceil((p / 100.0) * n) - 1; // nearest-rank
     idx = Math.max(0, Math.min(idx, n - 1));
-    return toMs(sortedLatenciesRaw.get(idx), nanos);
+    return sortedLatenciesMs.get(idx);
   }
 
-  private static void writeThroughputBuckets(Path outBucketsCsv, Map<Long, Integer> bucketCounts) throws Exception {
+  private static void writeThroughputBuckets(Path outBucketsCsv, Map<Long, Integer> bucketCounts)
+      throws Exception {
     Files.createDirectories(outBucketsCsv.getParent());
 
     List<Long> keys = new ArrayList<>(bucketCounts.keySet());
