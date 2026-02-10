@@ -7,10 +7,12 @@ Multithreaded WebSocket client that performs high-volume load testing with basic
 ## 📋 Features
 
 ### Warmup Phase
-- 32 concurrent threads
+- 32 concurrent connections
 - 1,000 messages per thread (32,000 total)
-- All messages sent to room 1
-- Primes server and JVM
+- Messages distributed across rooms
+- Room 1-12 has 2 connections, Room 13-20 has 1 connection
+- Connections kept open for main phase
+
 
 ### Main Phase
 - 560 concurrent connections (28 per room)
@@ -32,11 +34,10 @@ Multithreaded WebSocket client that performs high-volume load testing with basic
 ### Threading Model
 ```
 Main Thread
+  ├── Warmup: 32 Worker Threads (kept alive)
+  │   └── 1000 messages each → Various rooms
+  ├── Main Phase: Reuse 32 + Create 528 new (560 total)
   ├── Generator Thread (produces 500K messages)
-  ├── Worker Thread Pool (560 threads)
-  │   ├── Worker 1-28 → Room 1
-  │   ├── Worker 29-56 → Room 2
-  │   └── ... → Room 3-20
   └── Metrics aggregation
 ```
 
@@ -103,26 +104,29 @@ Performing server health check...
 ✓ Server health check passed: {"status":"healthy"}
 Starting load test...
 
-Warmup done.
+=== Starting Warmup Phase ===
+=== Warmup Phase Complete ===
 OK=32000 failed=0
-timeSec=31.973
-throughput msg/s=1000.82
-Warmup connections closed. Ready for main phase.
+timeSec=30.90
+throughput msg/s=1035.72
+Warmup connections remain open for reuse.
 ```
 
 ### Main Phase
 ```
-=== Starting main phase ===
+=== Starting Main Phase ===
 
-Main phase done.
+All workers ready. Generating main phase messages and sending them...
+
+=== Main Phase Results ===
 OK=500000 failed=0
-timeSec=36.508
-throughput msg/s=13695.68
+timeSec=36.03
+throughput msg/s=13875.80
 connections=560
 reconnections=0
-connectionFailures=356
+connectionFailures=0
 deadWorkers=0
-messagesLost=0
+warmupConnectionsReused=32
 ```
 
 ---
@@ -139,7 +143,7 @@ messagesLost=0
 | `reconnections` | Times connections were re-established during sending |
 | `connectionFailures` | Failed connection attempts (before success) |
 | `deadWorkers` | Workers that never connected |
-| `messagesLost` | Messages not accounted for (should be 0) |
+| `warmupConnectionsReused` | Reused warmup connections count |
 
 ---
 
@@ -158,8 +162,7 @@ Server is not healthy. Aborting load test.
 ```
 **Solution:** 
 - Check server capacity (may be overwhelmed)
-- Reduce `connPerRoom` from 28 to 14
-- Increase connection timeout in `ConnectionWorker.java`
+- Reduce `connPerRoom`
 
 ### Out of Memory
 ```
@@ -183,8 +186,7 @@ client-part1/
             └── edu/northeastern/cs6650/client/
                 ├── LoadTestClient.java          # Entry point
                 ├── generator/
-                │   ├── MainPhaseMessageGenerator.java
-                │   └── WarmupMessageGenerator.java
+                │   └── MainPhaseMessageGenerator.java
                 ├── loadtest/
                 │   └── LoadTestRunner.java      # Test orchestrator
                 ├── model/
@@ -194,8 +196,7 @@ client-part1/
                 │   ├── MessageFactory.java
                 │   └── RandomGenerator.java
                 └── ws/
-                    ├── ConnectionWorker.java    # WebSocket worker
-                    └── StopMode.java
+                    └── ConnectionWorker.java    # WebSocket worker
 ```
 
 ---
@@ -213,4 +214,4 @@ client-part1/
 - This is the **basic** implementation without per-message metrics
 - For detailed latency analysis, see [client-part2](../client-part2/)
 - Warmup phase is crucial for accurate main phase measurements
-- Connection failures during startup are normal and handled with retries
+- Connection failures are normal and handled with retries
