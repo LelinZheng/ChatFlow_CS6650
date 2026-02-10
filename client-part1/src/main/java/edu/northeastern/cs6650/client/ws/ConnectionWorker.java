@@ -1,7 +1,5 @@
 package edu.northeastern.cs6650.client.ws;
 
-import static edu.northeastern.cs6650.client.ws.StopMode.FIXED_COUNT;
-
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.northeastern.cs6650.client.model.ChatMessage;
@@ -23,13 +21,6 @@ import org.java_websocket.handshake.ServerHandshake;
  * This guarantees at most one in-flight message per connection and enables
  * accurate latency measurement.</p>
  *
- * <p>The worker supports two termination modes:
- * <ul>
- *   <li>{@link StopMode#FIXED_COUNT} – send a fixed number of messages (warmup)</li>
- *   <li>{@link StopMode#POISON_PILL} – run until an explicit termination signal
- *       is received (main phase)</li>
- * </ul>
- * </p>
  */
 public class ConnectionWorker implements Runnable {
 
@@ -37,8 +28,6 @@ public class ConnectionWorker implements Runnable {
 
   private final BlockingQueue<ChatMessage> outbound;
   private final URI serverUri;
-  private int maxToSend = 0;
-  private final StopMode mode;
 
   // Echo mailbox: 1-slot handoff for "send -> wait echo"
   private final BlockingQueue<String> echoMailbox = new ArrayBlockingQueue<>(1);
@@ -60,57 +49,22 @@ public class ConnectionWorker implements Runnable {
    * Creates a connection worker that owns a single persistent WebSocket connection
    * and consumes messages from the provided queue.
    *
-   * <p>This constructor is typically used for {@link StopMode#FIXED_COUNT} mode,
-   * where the worker sends exactly {@code maxToSend} messages before terminating.</p>
-   *
    * @param outbound queue from which messages are consumed
    * @param serverUri WebSocket endpoint URI (e.g., {@code ws://host:port/chat/{roomId}})
    * @param maxRetries maximum number of send/echo attempts per message before counting it as failed
    * @param echoTimeoutMs maximum time to wait for an echo acknowledgement per message (milliseconds)
-   * @param stopMode worker termination mode (fixed-count or poison-pill)
-   * @param maxToSend number of messages to send when using {@link StopMode#FIXED_COUNT}
    */
   public ConnectionWorker(BlockingQueue<ChatMessage> outbound,
       URI serverUri,
       int maxRetries,
-      long echoTimeoutMs,
-      StopMode stopMode,
-      int maxToSend) {
+      long echoTimeoutMs) {
     this.outbound = outbound;
     this.serverUri = serverUri;
     this.maxRetries = maxRetries;
     this.echoTimeoutMs = echoTimeoutMs;
-    this.maxToSend = maxToSend;
-    this.mode = stopMode;
     this.client = buildClient(serverUri);
   }
 
-  /**
-   * Creates a connection worker that owns a single persistent WebSocket connection
-   * and consumes messages from the provided queue until a poison-pill message is received.
-   *
-   * <p>This constructor is typically used for {@link StopMode#POISON_PILL} mode,
-   * which is required when messages are routed randomly and the exact per-worker
-   * message count is not known in advance.</p>
-   *
-   * @param outbound queue from which messages are consumed
-   * @param serverUri WebSocket endpoint URI (e.g., {@code ws://host:port/chat/{roomId}})
-   * @param maxRetries maximum number of send/echo attempts per message before counting it as failed
-   * @param echoTimeoutMs maximum time to wait for an echo acknowledgement per message (milliseconds)
-   * @param stopMode worker termination mode (should be {@link StopMode#POISON_PILL})
-   */
-  public ConnectionWorker(BlockingQueue<ChatMessage> outbound,
-      URI serverUri,
-      int maxRetries,
-      long echoTimeoutMs,
-      StopMode stopMode) {
-    this.outbound = outbound;
-    this.serverUri = serverUri;
-    this.maxRetries = maxRetries;
-    this.echoTimeoutMs = echoTimeoutMs;
-    this.mode = stopMode;
-    this.client = buildClient(serverUri);
-  }
 
   /**
    * Builds a new WebSocket client with configured handlers.
@@ -211,15 +165,6 @@ public class ConnectionWorker implements Runnable {
    * using a send-then-wait-for-echo protocol to ensure at most one in-flight
    * message per connection.</p>
    *
-   * <p>Termination behavior depends on the configured {@link StopMode}:
-   * <ul>
-   *   <li>{@link StopMode#FIXED_COUNT}: send exactly {@code maxToSend} messages
-   *       and then terminate (used during warmup)</li>
-   *   <li>{@link StopMode#POISON_PILL}: continue processing messages until a
-   *       poison-pill message is received (used during the main phase)</li>
-   * </ul>
-   * </p>
-   *
    * <p>Initial connection attempts use exponential backoff (50ms, 100ms, 200ms, 400ms, 800ms)
    * up to 5 retries as specified in the assignment requirements.</p>
    *
@@ -263,22 +208,13 @@ public class ConnectionWorker implements Runnable {
         return;
       }
 
-      if (mode == FIXED_COUNT) {
-        for (int i = 0; i < maxToSend; i++) {
-          ChatMessage msg = outbound.take();
-          boolean ok = sendWaitEchoWithRetries(msg);
-          if (ok) sentOk.incrementAndGet();
-          else sentFailed.incrementAndGet();
-        }
-      } else { // POISON_PILL
-        while (true) {
-          ChatMessage msg = outbound.take();
-          if (msg.isPoison()) break;
+      while (true) {
+        ChatMessage msg = outbound.take();
+        if (msg.isPoison()) break;
 
-          boolean ok = sendWaitEchoWithRetries(msg);
-          if (ok) sentOk.incrementAndGet();
-          else sentFailed.incrementAndGet();
-        }
+        boolean ok = sendWaitEchoWithRetries(msg);
+        if (ok) sentOk.incrementAndGet();
+        else sentFailed.incrementAndGet();
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -302,7 +238,6 @@ public class ConnectionWorker implements Runnable {
         Thread.currentThread().getName() +
         ", queue size: " + outbound.size());
     int drained = 0;
-
     while (true) {
       ChatMessage msg = outbound.poll(); // Non-blocking poll
       if (msg == null) break;
@@ -310,7 +245,6 @@ public class ConnectionWorker implements Runnable {
 
       sentFailed.incrementAndGet();
       drained++;
-
     }
     if (drained > 0) {
       System.err.println("  Drained " + drained + " messages as failures from " +
@@ -378,6 +312,7 @@ public class ConnectionWorker implements Runnable {
         if (echo != null) {
           long t1 = System.nanoTime();
           latencySumNanos.addAndGet(t1 - t0);
+          long latencyMillis = TimeUnit.NANOSECONDS.toMillis(t1 - t0);
           return true;
         }
 
@@ -395,6 +330,7 @@ public class ConnectionWorker implements Runnable {
         backoffMs *= 2;
       }
     }
+
     return false;
   }
 

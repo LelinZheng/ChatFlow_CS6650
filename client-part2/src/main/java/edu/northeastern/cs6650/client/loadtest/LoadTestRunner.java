@@ -196,8 +196,6 @@ public class LoadTestRunner {
     // MAIN PHASE - Add workers to reach connPerRoom target
     System.out.println("\n=== Starting Main Phase ===");
 
-    int additionalWorkersNeeded = mainPhaseWorkers - warmupWorkers;
-
     Path mainCsvPath = outDir.resolve("main_metrics.csv");
     Thread mainMetricsWriter = new Thread(
         new CsvMetricsWriter(metricsQueue, mainCsvPath), "main-metrics-writer");
