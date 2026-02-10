@@ -43,17 +43,7 @@ public class LoadTestClient {
 
     System.out.println("Starting load test...");
     LoadTestRunner runner = new LoadTestRunner(wsBaseUri);
-    runner.runWarmup();
-
-    System.out.println("\n=== Waiting for connection cleanup before main phase ===");
-    try {
-      Thread.sleep(10000); // 5 second delay to allow connections to fully close
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-    System.out.println("=== Starting main phase ===\n");
-
-    runner.runMainPhase();
+    runner.runLoadTest();
   }
 
   /**
