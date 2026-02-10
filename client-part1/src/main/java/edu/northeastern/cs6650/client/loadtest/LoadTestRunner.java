@@ -21,6 +21,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -125,10 +126,17 @@ public class LoadTestRunner {
     } finally {
       pool.shutdown();
       try {
+        //Wait for all threads to fully terminate
+        if (!pool.awaitTermination(30, TimeUnit.SECONDS)) {
+          System.err.println("Warmup pool did not terminate in time, forcing shutdown");
+          pool.shutdownNow();
+        }
+
         metricsQueue.put(MetricRecord.poison());
         metricsWriter.join();
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
+        pool.shutdownNow();
       }
     }
 
@@ -143,6 +151,7 @@ public class LoadTestRunner {
     System.out.println("OK=" + ok + " failed=" + failed);
     System.out.println("timeSec=" + durationSeconds);
     System.out.println("throughput msg/s=" + throughput);
+    System.out.println("Warmup connections closed. Ready for main phase.");
   }
 
   /**
@@ -163,7 +172,7 @@ public class LoadTestRunner {
    * runtime, and throughput for the main phase.</p>
    */
   public void runMainPhase() {
-    int connPerRoom = 5;
+    int connPerRoom = 28;
     int rooms = 20;
     int mainPhaseThread = connPerRoom * rooms;
     int totalMsg = 500_000;
@@ -223,6 +232,11 @@ public class LoadTestRunner {
     } finally {
       pool.shutdown();
       try {
+        if (!pool.awaitTermination(30, TimeUnit.SECONDS)) {
+          System.err.println("Main phase pool did not terminate in time, forcing shutdown");
+          pool.shutdownNow();
+        }
+
         metricsQueue.put(MetricRecord.poison());
         metricsWriter.join();
       } catch (InterruptedException e) {
@@ -236,10 +250,8 @@ public class LoadTestRunner {
     int failed = senderTasks.stream().mapToInt(ConnectionWorker::getSentFailed).sum();
     double durationSeconds = (end - start) / 1_000_000_000.0;
     double throughput = ok / durationSeconds;
-    int totalReconnects =
-        senderTasks.stream().mapToInt(ConnectionWorker::getReconnects).sum();
-
-    int totalConnections = senderTasks.size();
+    int totalConnections = senderTasks.stream().mapToInt(ConnectionWorker::getOpens).sum();
+    int totalReconnects = senderTasks.stream().mapToInt(ConnectionWorker::getReconnects).sum();
 
     System.out.println("Main phase done.");
     System.out.println("OK=" + ok + " failed=" + failed);

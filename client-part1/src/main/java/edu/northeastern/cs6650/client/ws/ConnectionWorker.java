@@ -47,6 +47,7 @@ public class ConnectionWorker implements Runnable {
   private final AtomicInteger sentOk = new AtomicInteger(0);
   private final AtomicInteger sentFailed = new AtomicInteger(0);
   private final AtomicInteger reconnects = new AtomicInteger(0);
+  private final AtomicInteger opens = new AtomicInteger(0);
 
   private final AtomicLong latencySumNanos = new AtomicLong(0);
   private volatile WebSocketClient client;
@@ -118,12 +119,19 @@ public class ConnectionWorker implements Runnable {
     this.metricsQueue = metricsQueue;
   }
 
+  /**
+   * Builds a new WebSocket client with configured handlers.
+   *
+   * @param uri the WebSocket endpoint URI
+   * @return a new WebSocketClient instance
+   */
   private WebSocketClient buildClient(URI uri) {
     return new WebSocketClient(uri) {
 
       @Override
       public void onOpen(ServerHandshake serverHandshake) {
-        System.out.println("Connection opened: " + uri);
+        opens.incrementAndGet();
+        // System.out.println("Connection opened: " + uri);
       }
 
       @Override
@@ -137,7 +145,7 @@ public class ConnectionWorker implements Runnable {
 
       @Override
       public void onClose(int i, String s, boolean b) {
-        System.out.println("CLOSE " + uri + " code=" + i);
+        // System.out.println("CLOSE " + uri + " code=" + i);
 
       }
 
@@ -169,6 +177,20 @@ public class ConnectionWorker implements Runnable {
    */
   public int getReconnects() {
     return reconnects.get();
+  }
+
+  /**
+   * Returns the total number of successful WebSocket connection openings
+   * performed by this worker.
+   *
+   * <p>This counter is incremented every time the underlying WebSocket
+   * transitions to the {@code OPEN} state, including the initial connection
+   * and any subsequent successful reconnections.</p>
+   *
+   * @return total number of successful WebSocket {@code onOpen} events
+   */
+  public int getOpens() {
+    return opens.get();
   }
 
   /**
@@ -228,18 +250,28 @@ public class ConnectionWorker implements Runnable {
   /**
    * Establishes the WebSocket connection if it is not already open.
    *
-   * <p>This method blocks until the WebSocket handshake completes successfully.
-   * It is safe to call multiple times; a connection attempt is only made when the
-   * client is not already open.</p>
+   * <p>This method blocks until the WebSocket handshake completes successfully
+   * or times out. It is safe to call multiple times; a connection attempt is
+   * only made when the client is not already open.</p>
    *
    * @throws InterruptedException if the current thread is interrupted while
    *                              waiting for the connection to open
    */
   private void connectBlocking() throws InterruptedException {
-    if (client == null)
+    if (client == null) {
       client = buildClient(serverUri);
+    }
     if (!client.isOpen()) {
-      client.connectBlocking();
+      try {
+        boolean connected = client.connectBlocking(10, TimeUnit.SECONDS);
+        if (!connected) {
+          System.err.println("❌ Connection timeout for " + serverUri + " [" + Thread.currentThread().getName() + "]");
+          throw new InterruptedException("Initial connection timeout after 10 seconds");
+        }
+      } catch (InterruptedException e) {
+        System.err.println("❌ Connection interrupted for " + serverUri + " [" + Thread.currentThread().getName() + "]");
+        throw e;
+      }
     }
   }
 
@@ -289,35 +321,30 @@ public class ConnectionWorker implements Runnable {
           );
           return true;
         }
-        if (attempt == maxRetries) {
-          metricsQueue.put(new MetricRecord(
-              sendTsMillis,
-              message.getMessageType(),
-              -1,
-              "TIMEOUT",
-              message.getRoomId()
-          ));
-          return false;
+        if (attempt < maxRetries) {
+          safeReconnect();
         }
-        safeReconnect();
       } catch (Exception e) {
-        if (attempt == maxRetries) {
-          metricsQueue.put(new MetricRecord(
-              sendTsMillis,
-              message.getMessageType(),
-              -1,
-              "FAILED",
-              message.getRoomId()
-          ));
-          return false;
+        if (attempt < maxRetries) {
+          safeReconnect();
         }
-        safeReconnect();
       }
 
       if (attempt < maxRetries) {
         Thread.sleep(backoffMs);
         backoffMs *= 2;
       }
+    }
+    try {
+      metricsQueue.put(new MetricRecord(
+          System.currentTimeMillis(),
+          message.getMessageType(),
+          -1,
+          "FAILED",
+          message.getRoomId()
+      ));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
     return false;
   }
@@ -333,7 +360,7 @@ public class ConnectionWorker implements Runnable {
   private void ensureConnected() throws InterruptedException {
     if (client == null) {
       client = buildClient(serverUri);
-      client.connectBlocking();
+      client.connectBlocking(10, TimeUnit.SECONDS);
       return;
     }
 
@@ -353,23 +380,38 @@ public class ConnectionWorker implements Runnable {
   private void safeReconnect() throws InterruptedException {
     reconnects.incrementAndGet();
     try {
-      client.close();
+      if (client != null) {
+        client.closeBlocking();
+      }
     } catch (Exception ignored) {
+      // Ignore close errors
     }
 
-    // Build a fresh client instance to avoid stale listener / state
+    // Build fresh client and connect
     client = buildClient(serverUri);
-    client.reconnectBlocking();
+    boolean connected = client.connectBlocking(10, TimeUnit.SECONDS);
   }
 
   /**
-   * Safely closes the current WebSocket connection.
+   * Safely closes the current WebSocket connection and waits for it to complete.
+   *
+   * <p>This method ensures the WebSocket connection is fully closed before
+   * returning, which is critical when transitioning between test phases to
+   * avoid resource leaks and connection limit issues.</p>
    */
   private void safeClose() {
     try {
-      if (client != null)
-        client.close();
-    } catch (Exception ignored) {
+      if (client != null && client.isOpen()) {
+        client.closeBlocking(); // Changed from close() to closeBlocking()
+      }
+    } catch (Exception e) {
+      // Force close if blocking close fails
+      try {
+        if (client != null) {
+          client.close();
+        }
+      } catch (Exception ignored) {
+      }
     }
   }
 
