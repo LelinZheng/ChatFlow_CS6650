@@ -16,6 +16,13 @@ public class WarmupMessageGenerator implements Runnable{
   private BlockingQueue<ChatMessage> messageQueue;
   private int messageCount;
   private final MessageFactory producer;
+
+  /**
+   * Constructs a WarmupMessageGenerator.
+   *
+   * @param messageQueue the shared blocking queue where generated messages are placed
+   * @param messageCount the total number of warmup messages to generate
+   */
   public WarmupMessageGenerator(BlockingQueue<ChatMessage> messageQueue, int messageCount) {
     this.messageQueue = messageQueue;
     this.messageCount = messageCount;
@@ -23,9 +30,11 @@ public class WarmupMessageGenerator implements Runnable{
   }
 
   /**
-   * Generates warmup messages and places them into the shared queue.
-   * All messages are assigned to room ID 1 for simplicity.
-   * The method blocks if the queue is full.
+   * Generates the configured number of warmup messages and places them into the queue.
+   *
+   * <p>This method runs in a dedicated thread and produces messages with randomized
+   * content. All messages are assigned to room 1. Message generation continues until
+   * the specified count is reached or the thread is interrupted.</p>
    */
   @Override
   public void run() {

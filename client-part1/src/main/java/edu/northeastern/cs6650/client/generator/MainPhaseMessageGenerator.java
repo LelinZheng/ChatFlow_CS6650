@@ -84,6 +84,14 @@ public class MainPhaseMessageGenerator implements Runnable {
     }
   }
 
+  /**
+   * Selects a random room ID for message routing.
+   *
+   * <p>Room IDs are distributed uniformly across the configured number of rooms
+   * to ensure balanced load distribution across all chat rooms during the test.</p>
+   *
+   * @return a random room ID between 1 and the configured number of rooms (inclusive)
+   */
   private int pickRoomId() {
     return randomGenerator.generateRandomInteger(1, rooms);
   }

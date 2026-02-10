@@ -253,12 +253,22 @@ public class LoadTestRunner {
     int totalConnections = senderTasks.stream().mapToInt(ConnectionWorker::getOpens).sum();
     int totalReconnects = senderTasks.stream().mapToInt(ConnectionWorker::getReconnects).sum();
 
+    int totalConnectionFailures = senderTasks.stream()
+        .mapToInt(ConnectionWorker::getConnectionFailures).sum();
+    int deadWorkers = (int) senderTasks.stream()
+        .filter(w -> w.getOpens() == 0)
+        .count();
+
     System.out.println("Main phase done.");
     System.out.println("OK=" + ok + " failed=" + failed);
     System.out.println("timeSec=" + durationSeconds);
     System.out.println("throughput msg/s=" + throughput);
     System.out.println("connections=" + totalConnections);
     System.out.println("reconnections=" + totalReconnects);
+
+    System.out.println("Failed connection attempts (before success): " + totalConnectionFailures);
+    System.out.println("deadWorkers=" + deadWorkers);
+    System.out.println("messagesLost=" + (totalMsg - ok - failed));
 
   }
 

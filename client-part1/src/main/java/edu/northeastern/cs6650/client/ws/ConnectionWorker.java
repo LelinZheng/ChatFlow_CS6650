@@ -48,6 +48,7 @@ public class ConnectionWorker implements Runnable {
   private final AtomicInteger sentFailed = new AtomicInteger(0);
   private final AtomicInteger reconnects = new AtomicInteger(0);
   private final AtomicInteger opens = new AtomicInteger(0);
+  private final AtomicInteger connectionFailures = new AtomicInteger(0);
 
   private final AtomicLong latencySumNanos = new AtomicLong(0);
   private volatile WebSocketClient client;
@@ -131,7 +132,6 @@ public class ConnectionWorker implements Runnable {
       @Override
       public void onOpen(ServerHandshake serverHandshake) {
         opens.incrementAndGet();
-        // System.out.println("Connection opened: " + uri);
       }
 
       @Override
@@ -145,8 +145,6 @@ public class ConnectionWorker implements Runnable {
 
       @Override
       public void onClose(int i, String s, boolean b) {
-        // System.out.println("CLOSE " + uri + " code=" + i);
-
       }
 
       @Override
@@ -194,6 +192,18 @@ public class ConnectionWorker implements Runnable {
   }
 
   /**
+   * Returns the number of times this worker failed to establish an initial connection.
+   *
+   * <p>This counter tracks connection failures that occurred during worker startup,
+   * not reconnections during message sending.</p>
+   *
+   * @return number of initial connection failures
+   */
+  public int getConnectionFailures() {
+    return connectionFailures.get();
+  }
+
+  /**
    * Get total latency sum in nanoseconds for all successful messages.
    * @return latency sum in nanoseconds
    */
@@ -218,18 +228,55 @@ public class ConnectionWorker implements Runnable {
    * </ul>
    * </p>
    *
+   * <p>Initial connection attempts use exponential backoff (50ms, 100ms, 200ms, 400ms, 800ms)
+   * up to 5 retries as specified in the assignment requirements.</p>
+   *
+   * <p>If the worker fails to establish an initial connection after all retries, it
+   * drains its queue and counts all messages as failed.</p>
+   *
    * <p>If the thread is interrupted, execution stops and the WebSocket connection
    * is closed.</p>
    */
   @Override
   public void run() {
+    boolean connected = false;
+
     try {
-      connectBlocking();
+      long backoffMs = 50; // Start at 50ms
+      for (int attempt = 1; attempt <= 5; attempt++) {
+        try {
+          client = buildClient(serverUri);
+          connectBlocking();
+          connected = true;
+          break;
+        } catch (InterruptedException e) {
+          connectionFailures.incrementAndGet();
+          if (attempt < 5) {
+            System.err.println("⚠️  Connection attempt " + attempt + "/5 failed for " +
+                serverUri + ", retrying in " + backoffMs + "ms... [" +
+                Thread.currentThread().getName() + "]");
+            Thread.sleep(backoffMs);
+            backoffMs *= 2;
+          } else {
+            System.err.println("❌ All 5 connection attempts failed for " +
+                serverUri + " [" + Thread.currentThread().getName() + "]");
+          }
+        }
+      }
+
+      if (!connected) {
+        System.err.println("Worker " + Thread.currentThread().getName() +
+            " draining queue as failures (never connected)");
+        drainQueueAsFailures();
+        return;
+      }
+
       if (mode == FIXED_COUNT) {
         for (int i = 0; i < maxToSend; i++) {
           ChatMessage msg = outbound.take();
           boolean ok = sendWaitEchoWithRetries(msg);
-          if (ok) sentOk.incrementAndGet(); else sentFailed.incrementAndGet();
+          if (ok) sentOk.incrementAndGet();
+          else sentFailed.incrementAndGet();
         }
       } else { // POISON_PILL
         while (true) {
@@ -237,13 +284,56 @@ public class ConnectionWorker implements Runnable {
           if (msg.isPoison()) break;
 
           boolean ok = sendWaitEchoWithRetries(msg);
-          if (ok) sentOk.incrementAndGet(); else sentFailed.incrementAndGet();
+          if (ok) sentOk.incrementAndGet();
+          else sentFailed.incrementAndGet();
         }
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     } finally {
       safeClose();
+    }
+  }
+
+  /**
+   * Drains all messages from the outbound queue and counts them as failures.
+   *
+   * <p>This method is called when a worker fails to establish an initial
+   * connection. It ensures that messages assigned to this dead worker are
+   * properly accounted for in failure statistics rather than silently lost.</p>
+   *
+   * <p>Each drained message is recorded in the metrics queue with a "NO_CONNECTION"
+   * status to distinguish connection failures from send failures.</p>
+   */
+  private void drainQueueAsFailures() {
+    System.err.println("DEBUG: drainQueueAsFailures() called for " +
+        Thread.currentThread().getName() +
+        ", queue size: " + outbound.size());
+    int drained = 0;
+    try {
+      while (true) {
+        ChatMessage msg = outbound.poll(); // Non-blocking poll
+        if (msg == null) break;
+        if (msg.isPoison()) break;
+
+        sentFailed.incrementAndGet();
+        drained++;
+
+        // Record in metrics
+        metricsQueue.put(new MetricRecord(
+            System.currentTimeMillis(),
+            msg.getMessageType(),
+            -1,
+            "NO_CONNECTION",
+            msg.getRoomId()
+        ));
+      }
+      if (drained > 0) {
+        System.err.println("  Drained " + drained + " messages as failures from " +
+            Thread.currentThread().getName());
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
     }
   }
 
@@ -258,31 +348,29 @@ public class ConnectionWorker implements Runnable {
    *                              waiting for the connection to open
    */
   private void connectBlocking() throws InterruptedException {
-    if (client == null) {
-      client = buildClient(serverUri);
-    }
     if (!client.isOpen()) {
-      try {
-        boolean connected = client.connectBlocking(10, TimeUnit.SECONDS);
-        if (!connected) {
-          System.err.println("❌ Connection timeout for " + serverUri + " [" + Thread.currentThread().getName() + "]");
-          throw new InterruptedException("Initial connection timeout after 10 seconds");
-        }
-      } catch (InterruptedException e) {
-        System.err.println("❌ Connection interrupted for " + serverUri + " [" + Thread.currentThread().getName() + "]");
-        throw e;
+      boolean connected = client.connectBlocking(10, TimeUnit.SECONDS);
+      if (!connected) {
+        throw new InterruptedException("Initial connection timeout after 10 seconds");
       }
     }
   }
 
   /**
    * Sends a single message over the WebSocket connection and waits for an echo
-   * acknowledgement, retrying on failure.
+   * acknowledgement, retrying on failure with exponential backoff.
    *
    * <p>The method enforces strict send ordering by waiting for an echo response
    * before returning. If no echo is received within {@code echoTimeoutMs}, or if
-   * a send error occurs, the connection is re-established and the send is retried
-   * with exponential backoff.</p>
+   * a send error occurs, the connection is re-established and the send is retried.</p>
+   *
+   * <p>Retry policy follows the assignment specification:
+   * <ul>
+   *   <li>Up to 5 retry attempts per message</li>
+   *   <li>Exponential backoff: 50ms, 100ms, 200ms, 400ms between retries</li>
+   *   <li>After 5 failed attempts, message is counted as failed</li>
+   * </ul>
+   * </p>
    *
    * <p>Latency is measured as the time between send initiation and echo receipt
    * and accumulated for later analysis, saved to a {@code metricsQueue}</p>
@@ -321,6 +409,7 @@ public class ConnectionWorker implements Runnable {
           );
           return true;
         }
+
         if (attempt < maxRetries) {
           safeReconnect();
         }
@@ -335,12 +424,13 @@ public class ConnectionWorker implements Runnable {
         backoffMs *= 2;
       }
     }
+
     try {
       metricsQueue.put(new MetricRecord(
           System.currentTimeMillis(),
           message.getMessageType(),
           -1,
-          "FAILED",
+          "FAILED_AFTER_RETRIES",
           message.getRoomId()
       ));
     } catch (InterruptedException e) {
@@ -360,7 +450,10 @@ public class ConnectionWorker implements Runnable {
   private void ensureConnected() throws InterruptedException {
     if (client == null) {
       client = buildClient(serverUri);
-      client.connectBlocking(10, TimeUnit.SECONDS);
+      boolean connected = client.connectBlocking(10, TimeUnit.SECONDS);
+      if (!connected) {
+        throw new InterruptedException("Connection timeout");
+      }
       return;
     }
 
@@ -372,24 +465,31 @@ public class ConnectionWorker implements Runnable {
   /**
    * Safely closes the current WebSocket connection and establishes a new one.
    *
-   * <p>This method increments the reconnect counter and rebuilds the underlying
-   * WebSocket client to avoid stale state or listener issues.</p>
+   * <p>This method increments the reconnect counter, closes the existing
+   * connection, and creates a fresh WebSocket client to avoid stale state
+   * or listener issues. The method blocks until the new connection is
+   * established or times out.</p>
    *
    * @throws InterruptedException if the thread is interrupted while reconnecting
    */
   private void safeReconnect() throws InterruptedException {
     reconnects.incrementAndGet();
+
+    // Close old connection
     try {
       if (client != null) {
         client.closeBlocking();
       }
     } catch (Exception ignored) {
-      // Ignore close errors
     }
 
     // Build fresh client and connect
     client = buildClient(serverUri);
     boolean connected = client.connectBlocking(10, TimeUnit.SECONDS);
+
+    if (!connected) {
+      throw new InterruptedException("Reconnection timeout after 10 seconds");
+    }
   }
 
   /**
@@ -402,7 +502,7 @@ public class ConnectionWorker implements Runnable {
   private void safeClose() {
     try {
       if (client != null && client.isOpen()) {
-        client.closeBlocking(); // Changed from close() to closeBlocking()
+        client.closeBlocking();
       }
     } catch (Exception e) {
       // Force close if blocking close fails

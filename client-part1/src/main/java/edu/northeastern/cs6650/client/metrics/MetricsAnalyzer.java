@@ -9,6 +9,17 @@ import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
 import org.apache.commons.csv.CSVRecord;
 
+/**
+ * Analyzes load test metrics and generates statistical summaries.
+ *
+ * <p>This analyzer processes CSV metric files generated during load testing to
+ * compute latency statistics (mean, median, percentiles), throughput per room,
+ * message type distribution, and time-series throughput data.</p>
+ *
+ * <p>The analyzer produces both console output for immediate review and a
+ * CSV file containing throughput measurements in 10-second time buckets for
+ * visualization and further analysis.</p>
+ */
 public class MetricsAnalyzer {
 
   /**
@@ -16,11 +27,21 @@ public class MetricsAnalyzer {
    * mean/median/p95/p99/min/max latency, throughput per room, and message type distribution.
    * Also writes throughput-over-time buckets (10-second windows) to {@code outBucketsCsv}.
    *
-   * Expected CSV headers:
-   * timestamp,messageType,latencyMs,statusCode,roomId
+   * <p>Expected CSV headers: timestamp, messageType, latencyMs, statusCode, roomId</p>
    *
-   * @param metricsCsv metrics CSV path
-   * @param outBucketsCsv output CSV path for throughput buckets (10-second)
+   * <p>The method computes:
+   * <ul>
+   *   <li>Latency statistics (mean, median, 95th/99th percentiles, min/max) for successful messages</li>
+   *   <li>Success and failure counts</li>
+   *   <li>Throughput per room (messages per second)</li>
+   *   <li>Message type distribution across all statuses</li>
+   *   <li>Time-series throughput in 10-second buckets</li>
+   * </ul>
+   * </p>
+   *
+   * @param metricsCsv the path to the input metrics CSV file
+   * @param outBucketsCsv the path where throughput bucket CSV will be written
+   * @throws Exception if file I/O or CSV parsing fails
    */
   public void analyzeAndPrint(Path metricsCsv, Path outBucketsCsv) throws Exception {
 
@@ -114,6 +135,12 @@ public class MetricsAnalyzer {
     System.out.println("Throughput buckets CSV: " + outBucketsCsv.toAbsolutePath());
   }
 
+  /**
+   * Calculates the arithmetic mean of latency measurements.
+   *
+   * @param latenciesMs list of latency values in milliseconds
+   * @return the mean latency in milliseconds, or 0 if the list is empty
+   */
   private static double meanMs(List<Long> latenciesMs) {
     if (latenciesMs.isEmpty()) return 0;
     long sum = 0;
@@ -122,6 +149,16 @@ public class MetricsAnalyzer {
   }
 
 
+  /**
+   * Calculates the specified percentile of latency measurements using the nearest-rank method.
+   *
+   * <p>The input list must be sorted in ascending order for accurate results.
+   * This method uses the nearest-rank (exclusive) definition of percentiles.</p>
+   *
+   * @param sortedLatenciesMs list of latency values in milliseconds, sorted in ascending order
+   * @param p the percentile to compute (e.g., 50 for median, 95 for p95, 99 for p99)
+   * @return the latency value at the specified percentile in milliseconds, or 0 if the list is empty
+   */
   private static double percentileMs(List<Long> sortedLatenciesMs, int p) {
     if (sortedLatenciesMs.isEmpty()) return 0;
     int n = sortedLatenciesMs.size();
@@ -130,6 +167,19 @@ public class MetricsAnalyzer {
     return sortedLatenciesMs.get(idx);
   }
 
+  /**
+   * Writes throughput measurements in 10-second time buckets to a CSV file.
+   *
+   * <p>Each bucket represents a 10-second window and contains the count of messages
+   * processed during that window and the calculated throughput (messages per second).
+   * Buckets are written in chronological order.</p>
+   *
+   * <p>The output CSV has headers: bucketStartMillis, count, throughputMsgPerSec</p>
+   *
+   * @param outBucketsCsv the path where the throughput bucket CSV will be written
+   * @param bucketCounts map of bucket start timestamps (in milliseconds) to message counts
+   * @throws Exception if file I/O or CSV writing fails
+   */
   private static void writeThroughputBuckets(Path outBucketsCsv, Map<Long, Integer> bucketCounts)
       throws Exception {
     Files.createDirectories(outBucketsCsv.getParent());
