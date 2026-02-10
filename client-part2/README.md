@@ -125,7 +125,9 @@ bucketStartMillis,count,throughputMsgPerSec
 ```
 === Starting main phase ===
 
-Main phase done.
+All workers ready. Generating main phase messages and sending them...
+
+=== Main Phase Results ===
 OK=500000 failed=0
 timeSec=36.370
 throughput msg/s=13742.28
@@ -133,7 +135,7 @@ connections=560
 reconnections=0
 connectionFailures=356
 deadWorkers=0
-messagesLost=0
+warmupConnectionsReused=32
 
 Load test summary:
 Main phase metrics to be aggregated here.
@@ -216,9 +218,6 @@ mvn test
 
 # Specific test class
 mvn test -Dtest=MetricsAnalyzerTest
-
-# With coverage
-mvn jacoco:report
 ```
 
 ### Test Coverage
@@ -231,6 +230,13 @@ mvn jacoco:report
 ---
 
 ## ⚙️ Configuration
+
+### Connection Per Room
+```java
+// In LoadTestRunner.java
+int connPerRoom = 28; // must be >= 2 in order to reuse the warmup connections
+```
+
 
 ### Output Directory Configuration
 
@@ -246,16 +252,6 @@ In `LoadTestRunner.java`:
 ```java
 int queueCapacity = 3000;  // Per-worker message queue
 BlockingQueue<MetricRecord> metricsQueue = new ArrayBlockingQueue<>(50_000);
-```
-
-### Adjust Metrics Collection
-In `ConnectionWorker.java`:
-```java
-// To disable metrics (like Part 1):
-ConnectionWorker worker = new ConnectionWorker(
-    workerQueues[i], fullUri, 5, 5000, POISON_PILL, 
-    null  // Pass null to disable metrics
-);
 ```
 
 ---
@@ -279,14 +275,10 @@ ConnectionWorker worker = new ConnectionWorker(
 ## 📊 Performance Tuning
 
 ### If Throughput Too Low
-1. Increase connections per room: `connPerRoom = 35`
+1. Increase or decrease connections per room: `connPerRoom = 35`
 2. Reduce queue capacity to decrease memory: `queueCapacity = 2000`
 3. Disable console logging for workers
 
-### If Too Many Connection Failures
-1. Increase stagger delay: `Thread.sleep(200)` every 5 workers
-2. Increase connection timeout: `client.connectBlocking(30, TimeUnit.SECONDS)`
-3. Reduce total connections: `connPerRoom = 20`
 
 ### If Out of Memory
 ```bash
@@ -306,8 +298,7 @@ client-part2/
 │   │       └── edu/northeastern/cs6650/client/
 │   │           ├── LoadTestClient.java
 │   │           ├── generator/
-│   │           │   ├── MainPhaseMessageGenerator.java
-│   │           │   └── WarmupMessageGenerator.java
+│   │           │   └── MainPhaseMessageGenerator.java
 │   │           ├── loadtest/
 │   │           │   └── LoadTestRunner.java
 │   │           ├── metrics/              ← NEW in Part 2
@@ -321,8 +312,7 @@ client-part2/
 │   │           │   ├── MessageFactory.java
 │   │           │   └── RandomGenerator.java
 │   │           └── ws/
-│   │               ├── ConnectionWorker.java
-│   │               └── StopMode.java
+│   │               └── ConnectionWorker.java
 │   └── test/
 │       └── java/
 │           └── edu/northeastern/cs6650/client/
