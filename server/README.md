@@ -172,7 +172,7 @@ Example message:
 
 ## Deployment (AWS EC2)
 
-- Instance type: `t2.micro`
+- Instance type: `t3.micro`
 - Region: `us-west-2`
 - OS: Amazon Linux
 - Security Group:
