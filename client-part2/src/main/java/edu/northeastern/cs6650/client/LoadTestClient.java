@@ -32,8 +32,8 @@ public class LoadTestClient {
     System.out.println("Load Test Client Started");
 //    String httpBaseUrl = "http://localhost:8080";
 //    URI wsBaseUri = URI.create("ws://localhost:8080/chat/");
-    String httpBaseUrl = "http://ec2-52-12-121-36.us-west-2.compute.amazonaws.com:8080";
-    URI wsBaseUri = URI.create("ws://ec2-52-12-121-36.us-west-2.compute.amazonaws.com:8080/chat/");
+    String httpBaseUrl = "http://ec2-44-243-114-58.us-west-2.compute.amazonaws.com:8080";
+    URI wsBaseUri = URI.create("ws://ec2-44-243-114-58.us-west-2.compute.amazonaws.com:8080/chat/");
 
     System.out.println("Performing server health check...");
     if (!checkServerHealth(httpBaseUrl)) {
