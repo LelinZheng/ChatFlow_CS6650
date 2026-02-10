@@ -20,10 +20,18 @@ import java.time.Duration;
  */
 public class LoadTestClient {
 
+  /**
+   * Executes the complete load test workflow.
+   *
+   * <p>Performs health check, warmup, main phase, and final analysis.
+   * Exits with status code 1 if the server health check fails.</p>
+   *
+   * @param args command-line arguments (currently unused)
+   */
   public static void main(String[] args) {
     System.out.println("Load Test Client Started");
-    // String httpBaseUrl = "http://localhost:8080";
-    // URI wsBaseUri = URI.create("ws://localhost:8080/chat/");
+//    String httpBaseUrl = "http://localhost:8080";
+//    URI wsBaseUri = URI.create("ws://localhost:8080/chat/");
     String httpBaseUrl = "http://ec2-16-146-71-196.us-west-2.compute.amazonaws.com:8080";
     URI wsBaseUri = URI.create("ws://ec2-16-146-71-196.us-west-2.compute.amazonaws.com:8080/chat/");
 
@@ -35,7 +43,7 @@ public class LoadTestClient {
 
     System.out.println("Starting load test...");
     LoadTestRunner runner = new LoadTestRunner(wsBaseUri);
-    //runner.runWarmup();
+    runner.runWarmup();
 
     System.out.println("\n=== Waiting for connection cleanup before main phase ===");
     try {
