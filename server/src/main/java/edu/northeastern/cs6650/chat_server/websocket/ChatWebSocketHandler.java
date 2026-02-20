@@ -1,12 +1,20 @@
 package edu.northeastern.cs6650.chat_server.websocket;
 
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.MessageProperties;
+import edu.northeastern.cs6650.chat_server.config.ChannelPool;
+import edu.northeastern.cs6650.chat_server.config.RabbitMQConfig;
 import edu.northeastern.cs6650.chat_server.model.ClientMessage;
 import edu.northeastern.cs6650.chat_server.model.ErrorResponse;
-import edu.northeastern.cs6650.chat_server.model.ServerEchoResponse;
+import edu.northeastern.cs6650.chat_server.model.QueueMessage;
 import edu.northeastern.cs6650.chat_server.validation.MessageValidator;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -15,43 +23,61 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * WebSocket handler responsible for processing chat messages.
+ * WebSocket handler that processes incoming chat messages.
  * <p>
- * Handles incoming text messages, deserializes client payloads,
- * applies validation, and sends responses back to connected clients.
+ * Validates each message, wraps it in a {@link QueueMessage}, and publishes it
+ * to the RabbitMQ topic exchange for the appropriate room. The actual broadcasting
+ * to connected clients is handled by the consumer application.
  */
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
 
   private final ObjectMapper objectMapper;
 
+  private final ChannelPool channelPool;
+
+  private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
+
   /**
    * Constructor for ChatWebSocketHandler.
    * @param objectMapper the ObjectMapper for JSON processing
+   * @param channelPool  pool of RabbitMQ channels for publishing messages
    */
-  public ChatWebSocketHandler(ObjectMapper objectMapper) {
+  public ChatWebSocketHandler(ObjectMapper objectMapper, ChannelPool channelPool) {
+     this.channelPool = channelPool;
     this.objectMapper = objectMapper;
   }
 
   /**
-   * Handle new WebSocket connection establishment.
-   * @param session the WebSocket session
+   * Logs new WebSocket connections.
+   *
+   * @param session the newly established WebSocket session
    */
   public void afterConnectionEstablished(WebSocketSession session) {
     System.out.println("New WebSocket connection established: " + session.getId());
   }
 
   /**
-   * Handle incoming text messages from clients.
-   * @param session the WebSocket session
-   * @param message the incoming text message
-   * @throws IOException if an I/O error occurs
+   * Processes an incoming WebSocket text message.
+   * <p>
+   * Steps:
+   * <ol>
+   *   <li>Deserialize JSON payload into {@link ClientMessage}</li>
+   *   <li>Validate fields via {@link MessageValidator}</li>
+   *   <li>Publish a {@link QueueMessage} to RabbitMQ on routing key {@code room.{roomId}}</li>
+   * </ol>
+   * Validation or JSON errors are sent back to the client as {@link ErrorResponse}.
+   *
+   * @param session the sender's WebSocket session
+   * @param message the raw text frame received
+   * @throws IOException if sending an error response fails
    */
   protected void handleTextMessage(WebSocketSession session, TextMessage message)
       throws IOException {
 
+    ClientMessage clientMessage;
     try {
-      ClientMessage clientMessage = objectMapper.readValue(message.getPayload(),
+      clientMessage = objectMapper.readValue(message.getPayload(),
           ClientMessage.class);
     } catch (Exception e){
       ErrorResponse err = new ErrorResponse(
@@ -64,8 +90,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
       return;
     }
 
-    ClientMessage clientMessage = objectMapper.readValue(message.getPayload(),
-        ClientMessage.class);
     List<String> errors = MessageValidator.validate(clientMessage);
 
     if (!errors.isEmpty()){
@@ -80,20 +104,46 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
       return;
     }
 
-    ServerEchoResponse echoResponse = new ServerEchoResponse(
-        "OK",
-        clientMessage.getMessage(),
-        Instant.now().toString()
+    QueueMessage queueMsg = new QueueMessage(
+        UUID.randomUUID().toString(),           // messageId
+        clientMessage.getRoomId(),              // roomId
+        clientMessage.getUserId(),              // userId
+        clientMessage.getUsername(),            // username
+        clientMessage.getMessage(),             // message
+        Instant.now().toString(),               // timestamp
+        clientMessage.getMessageType().name(),  // messageType
+        session.getLocalAddress().toString(),   // serverId
+        session.getRemoteAddress().toString()   // clientIp
     );
-    session.sendMessage(
-        new TextMessage(objectMapper.writeValueAsString(echoResponse))
-    );
+
+    String json = objectMapper.writeValueAsString(queueMsg);
+    String routingKey = "room." + clientMessage.getRoomId();
+
+    Channel channel = null;
+    try {
+      channel = channelPool.borrowChannel();
+      channel.basicPublish(
+          RabbitMQConfig.EXCHANGE_NAME,
+          routingKey,
+          MessageProperties.PERSISTENT_TEXT_PLAIN,
+          json.getBytes(StandardCharsets.UTF_8)
+      );
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      log.error("Interrupted while borrowing channel");
+    } catch (Exception e) {
+      log.error("Failed to publish message to queue: {}", e.getMessage());
+    } finally {
+      channelPool.returnChannel(channel);
+    }
+
   }
 
   /**
-   * Handle WebSocket connection closure.
-   * @param session the WebSocket session
-   * @param status the close status
+   * Logs WebSocket connection closures.
+   *
+   * @param session the closed WebSocket session
+   * @param status  the close status code and reason
    */
   public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
     System.out.println("WebSocket connection closed: " + session.getId());
