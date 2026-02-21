@@ -49,6 +49,3 @@ build/
 
 # ===== Docker =====
 deployment/rabbitmq_data/
-
-# ===== Application Properties =====
-**/application.properties
