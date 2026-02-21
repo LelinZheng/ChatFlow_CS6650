@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -39,12 +38,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
   private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
 
-  private final AtomicInteger failureCount = new AtomicInteger(0);
-
-  private volatile boolean circuitOpen = false;
-
-  private static final int FAILURE_THRESHOLD = 5;
-
   /**
    * Constructor for ChatWebSocketHandler.
    * @param objectMapper the ObjectMapper for JSON processing
@@ -64,24 +57,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     System.out.println("New WebSocket connection established: " + session.getId());
   }
 
-
-  /*
-   * Circuit Breaker (simplified, no half-open state)
-   *
-   * Tracks consecutive RabbitMQ publish failures. If FAILURE_THRESHOLD failures
-   * occur in a row with no successes in between, circuitOpen is set to true and
-   * all subsequent messages are rejected immediately with SERVICE_UNAVAILABLE
-   * without attempting to contact RabbitMQ.
-   *
-   * A successful publish resets failureCount to 0.
-   *
-   * Note: This implementation does not include a half-open state (where the circuit
-   * periodically allows one test message through to check if RabbitMQ has recovered).
-   * The circuit remains open until the server restarts. This is intentional for
-   * simplicity — in a production system, half-open recovery would be implemented
-   * using a scheduled task or timeout-based reset.
-   */
-
   /**
    * Processes an incoming WebSocket text message.
    * <p>
@@ -89,73 +64,61 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
    * <ol>
    *   <li>Deserialize JSON payload into {@link ClientMessage}</li>
    *   <li>Validate fields via {@link MessageValidator}</li>
-   *   <li>If the circuit breaker is open (too many recent RabbitMQ failures), drop the message</li>
    *   <li>Publish a {@link QueueMessage} to RabbitMQ on routing key {@code room.{roomId}}</li>
    * </ol>
    * Validation or JSON errors are sent back to the client as {@link ErrorResponse}.
-   * Failed publishes increment the circuit breaker failure count. Successful publishes reset it.
-   * If the circuit breaker threshold is reached, messages are dropped until the server restarts.
    *
    * @param session the sender's WebSocket session
    * @param message the raw text frame received
-   * @throws IOException if sending an error response to the client fails
+   * @throws IOException if sending an error response fails
    */
-  @Override
   protected void handleTextMessage(WebSocketSession session, TextMessage message)
       throws IOException {
 
-    // Parse JSON
     ClientMessage clientMessage;
     try {
-      clientMessage = objectMapper.readValue(message.getPayload(), ClientMessage.class);
-    } catch (Exception e) {
+      clientMessage = objectMapper.readValue(message.getPayload(),
+          ClientMessage.class);
+    } catch (Exception e){
       ErrorResponse err = new ErrorResponse(
           "INVALID_JSON",
           "Malformed JSON payload",
           List.of(e.getMessage()));
-      session.sendMessage(new TextMessage(objectMapper.writeValueAsString(err)));
+      session.sendMessage(
+          new TextMessage(objectMapper.writeValueAsString(err))
+      );
       return;
     }
 
-    // Validate fields
     List<String> errors = MessageValidator.validate(clientMessage);
-    if (!errors.isEmpty()) {
+
+    if (!errors.isEmpty()){
       ErrorResponse errorResponse = new ErrorResponse(
           "VALIDATION_FAILED",
           "Message validation failed",
-          errors);
-      session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse)));
+          errors
+      );
+      session.sendMessage(
+          new TextMessage(objectMapper.writeValueAsString(errorResponse))
+      );
       return;
     }
 
-    // Check circuit breaker before attempting to publish
-    if (circuitOpen) {
-      log.warn("Circuit breaker open — dropping message for room {}", clientMessage.getRoomId());
-      ErrorResponse circuitErr = new ErrorResponse(
-          "SERVICE_UNAVAILABLE",
-          "Message queue is currently unavailable, please try again later",
-          List.of());
-      session.sendMessage(new TextMessage(objectMapper.writeValueAsString(circuitErr)));
-      return;
-    }
-
-    // Build queue message
     QueueMessage queueMsg = new QueueMessage(
-        UUID.randomUUID().toString(),
-        clientMessage.getRoomId(),
-        clientMessage.getUserId(),
-        clientMessage.getUsername(),
-        clientMessage.getMessage(),
-        Instant.now().toString(),
-        clientMessage.getMessageType().name(),
-        session.getLocalAddress().toString(),
-        session.getRemoteAddress().toString()
+        UUID.randomUUID().toString(),           // messageId
+        clientMessage.getRoomId(),              // roomId
+        clientMessage.getUserId(),              // userId
+        clientMessage.getUsername(),            // username
+        clientMessage.getMessage(),             // message
+        Instant.now().toString(),               // timestamp
+        clientMessage.getMessageType().name(),  // messageType
+        session.getLocalAddress().toString(),   // serverId
+        session.getRemoteAddress().toString()   // clientIp
     );
 
     String json = objectMapper.writeValueAsString(queueMsg);
     String routingKey = "room." + clientMessage.getRoomId();
 
-    // Publish to RabbitMQ
     Channel channel = null;
     try {
       channel = channelPool.borrowChannel();
@@ -165,34 +128,15 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
           MessageProperties.PERSISTENT_TEXT_PLAIN,
           json.getBytes(StandardCharsets.UTF_8)
       );
-      // Reset failure count only on success
-      failureCount.set(0);
-
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
-      log.error("Interrupted while borrowing channel for session {}", session.getId());
-
+      log.error("Interrupted while borrowing channel");
     } catch (Exception e) {
-      // Increment failure count and open circuit if threshold reached
-      int failures = failureCount.incrementAndGet();
-      if (failures >= FAILURE_THRESHOLD) {
-        circuitOpen = true;
-        log.error("Circuit breaker OPEN after {} consecutive failures — messages will be dropped",
-            failures);
-      }
-      log.error("Failed to publish message to room {}: {}", clientMessage.getRoomId(),
-          e.getMessage());
-      // Notify client that their message was not delivered
-      ErrorResponse publishErr = new ErrorResponse(
-          "PUBLISH_FAILED",
-          "Failed to deliver message, please try again",
-          List.of(e.getMessage()));
-      session.sendMessage(new TextMessage(objectMapper.writeValueAsString(publishErr)));
-
+      log.error("Failed to publish message to queue: {}", e.getMessage());
     } finally {
-      // Always return channel to pool regardless of success or failure
       channelPool.returnChannel(channel);
     }
+
   }
 
   /**
