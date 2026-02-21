@@ -13,18 +13,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Spring configuration class that manages the RabbitMQ connection lifecycle.
- * <p>
- * On startup, establishes a single shared TCP connection to RabbitMQ and
- * declares the topic exchange and all 20 room queues with TTL and size limits.
- * The connection is shared across the app via {@link #getConnection()}.
- */
 @Configuration
 public class RabbitMQConfig {
   private static final Logger log = LoggerFactory.getLogger(RabbitMQConfig.class);
 
-  /** Name of the topic exchange all room messages are published to. */
   public static final String EXCHANGE_NAME = "chat.exchange";
   public static final int NUM_ROOMS = 20;
 
@@ -42,19 +34,6 @@ public class RabbitMQConfig {
 
   private Connection connection;
 
-  /**
-   * Initializes the RabbitMQ connection and declares exchange + queues.
-   * <p>
-   * Called automatically by Spring after all {@code @Value} fields are injected.
-   * Declares a durable topic exchange and 20 durable room queues, each with:
-   * <ul>
-   *   <li>60 second message TTL</li>
-   *   <li>10,000 message max length</li>
-   * </ul>
-   * If declaration fails, the exception is rethrown to abort application startup.
-   *
-   * @throws Exception if the connection or queue declaration fails
-   */
   @PostConstruct
   public void init() throws Exception {
     ConnectionFactory factory = new ConnectionFactory();
@@ -75,7 +54,7 @@ public class RabbitMQConfig {
 
       for (int i = 1; i <= NUM_ROOMS; i++) {
         String queueName = "room." + i;
-        ch.queueDeclare(queueName, true, false, false, queueArgs);
+        ch.queueDeclare(queueName, true, false, false, null);
         ch.queueBind(queueName, EXCHANGE_NAME, "room." + i);
       }
       log.info("Declared exchange and {} queues", NUM_ROOMS);
@@ -85,22 +64,10 @@ public class RabbitMQConfig {
     }
   }
 
-  /**
-   * Returns the shared RabbitMQ TCP connection.
-   * Used by {@link ChannelPool} to create channels.
-   *
-   * @return the active RabbitMQ {@link Connection}
-   */
   public Connection getConnection() {
     return connection;
   }
 
-  /**
-   * Closes the RabbitMQ connection on application shutdown.
-   * Triggered automatically by Spring before the bean is destroyed.
-   *
-   * @throws Exception if closing the connection fails
-   */
   @PreDestroy
   public void close() throws Exception {
     if (connection != null && connection.isOpen()) {

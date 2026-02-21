@@ -1,5 +1,0 @@
-# RabbitMQ
-rabbitmq.host=localhost
-rabbitmq.port=5672
-rabbitmq.username=your_username
-rabbitmq.password=your_password
