@@ -43,9 +43,3 @@ build/
 
 # ===== OS =====
 .DS_Store
-
-# ===== Environment Variables =====
-**/.env
-
-# ===== Docker =====
-deployment/rabbitmq_data/
