@@ -2,12 +2,6 @@ package edu.northeastern.cs6650.chat_server.websocket;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
-
-import com.rabbitmq.client.Channel;
-import com.rabbitmq.client.MessageProperties;
-import edu.northeastern.cs6650.chat_server.config.ChannelPool;
-import edu.northeastern.cs6650.chat_server.config.RabbitMQConfig;
-import java.net.InetSocketAddress;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -20,35 +14,14 @@ public class ChatWebSocketHandlerTest {
 
   private final ObjectMapper mapper = new ObjectMapper();
 
-  /** Builds a mock ChannelPool that returns a mock Channel. */
-  private ChannelPool mockChannelPool() throws Exception {
-    Channel mockChannel = mock(Channel.class);
-    ChannelPool mockPool = mock(ChannelPool.class);
-    when(mockPool.borrowChannel()).thenReturn(mockChannel);
-    return mockPool;
-  }
-
-  private String validPayload() {
-    return """
-            {
-              "userId": "123",
-              "username": "user_123",
-              "message": "hello",
-              "timestamp": "%s",
-              "messageType": "TEXT",
-              "roomId": "5"
-            }
-            """.formatted(Instant.now().toString());
-  }
-
   @Test
   void handleTextMessage_invalidJson_sendsInvalidJsonError() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool());
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper);
     WebSocketSession session = mock(WebSocketSession.class);
 
     handler.handleTextMessage(session, new TextMessage("{not valid json"));
 
-    TextMessage sent = captureOneSentMessage(session);
+    TextMessage sent = captureSentTextMessage(session);
     JsonNode root = mapper.readTree(sent.getPayload());
 
     assertEquals("ERROR", root.get("status").asText());
@@ -60,87 +33,61 @@ public class ChatWebSocketHandlerTest {
 
   @Test
   void handleTextMessage_validationFailed_sendsValidationFailedError() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool());
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper);
     WebSocketSession session = mock(WebSocketSession.class);
 
-    // username too short, bad timestamp, missing roomId
     String payload = """
-            {
-              "userId": "123",
-              "username": "ab",
-              "message": "hi",
-              "timestamp": "bad-ts",
-              "messageType": "TEXT",
-              "roomId": "5"
-            }
-            """;
+        {
+          "userId": "123",
+          "username": "ab",
+          "message": "hi",
+          "timestamp": "bad-ts",
+          "messageType": "TEXT"
+        }
+        """;
 
     handler.handleTextMessage(session, new TextMessage(payload));
 
-    TextMessage sent = captureOneSentMessage(session);
+    TextMessage sent = captureSentTextMessage(session);
     JsonNode root = mapper.readTree(sent.getPayload());
 
     assertEquals("ERROR", root.get("status").asText());
     assertEquals("VALIDATION_FAILED", root.get("errorCode").asText());
     assertEquals("Message validation failed", root.get("message").asText());
-
+    assertTrue(root.get("details").isArray());
     String details = root.get("details").toString();
     assertTrue(details.contains("username must be 3-20 alphanumeric characters"));
-    assertTrue(details.contains("timestamp must be in ISO-8601 format"));
+    assertTrue(details.contains("timestamp must be in ISO 8601 format"));
   }
 
   @Test
-  void handleTextMessage_validMessage_publishesToRabbitMQ() throws Exception {
-    Channel mockChannel = mock(Channel.class);
-    ChannelPool mockPool = mock(ChannelPool.class);
-    when(mockPool.borrowChannel()).thenReturn(mockChannel);
-
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool);
+  void handleTextMessage_validTextMessage_sendsOkEcho() throws Exception {
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper);
     WebSocketSession session = mock(WebSocketSession.class);
-    when(session.getLocalAddress()).thenReturn(new InetSocketAddress("localhost", 8080));
-    when(session.getRemoteAddress()).thenReturn(new InetSocketAddress("127.0.0.1", 54321));
 
-    handler.handleTextMessage(session, new TextMessage(validPayload()));
+    String payload = """
+        {
+          "userId": "123",
+          "username": "user_123",
+          "message": "hello",
+          "timestamp": "%s",
+          "messageType": "TEXT"
+        }
+        """.formatted(Instant.now().toString());
 
-    // Handler should NOT send anything back to the client
-    verify(session, never()).sendMessage(any());
+    handler.handleTextMessage(session, new TextMessage(payload));
 
-    // Handler should publish to RabbitMQ on the correct routing key
-    verify(mockChannel, times(1)).basicPublish(
-        eq(RabbitMQConfig.EXCHANGE_NAME),
-        eq("room.5"),
-        eq(MessageProperties.PERSISTENT_TEXT_PLAIN),
-        any(byte[].class)
-    );
+    TextMessage sent = captureSentTextMessage(session);
+    JsonNode root = mapper.readTree(sent.getPayload());
 
-    // Channel must be returned to pool
-    verify(mockPool, times(1)).returnChannel(mockChannel);
+    assertEquals("OK", root.get("status").asText());
+    assertEquals("hello", root.get("message").asText());
+
+    assertNotNull(root.get("serverTimestamp"));
+    assertDoesNotThrow(() -> Instant.parse(root.get("serverTimestamp").asText()));
   }
 
-  @Test
-  void handleTextMessage_validMessage_returnsChannelEvenOnPublishFailure() throws Exception {
-    Channel mockChannel = mock(Channel.class);
-    ChannelPool mockPool = mock(ChannelPool.class);
-    when(mockPool.borrowChannel()).thenReturn(mockChannel);
-    doThrow(new RuntimeException("publish failed"))
-        .when(mockChannel).basicPublish(any(), any(), any(), any());
-
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool);
-    WebSocketSession session = mock(WebSocketSession.class);
-    when(session.getLocalAddress()).thenReturn(
-        new InetSocketAddress("localhost", 8080));
-    when(session.getRemoteAddress()).thenReturn(
-        new InetSocketAddress("127.0.0.1", 54321));
-
-    // Should not throw even if publish fails
-    assertDoesNotThrow(() ->
-        handler.handleTextMessage(session, new TextMessage(validPayload())));
-
-    // Channel must still be returned to pool despite the exception
-    verify(mockPool, times(1)).returnChannel(mockChannel);
-  }
-
-  private TextMessage captureOneSentMessage(WebSocketSession session) throws Exception {
+  private TextMessage captureSentTextMessage(WebSocketSession session) throws Exception {
     ArgumentCaptor<TextMessage> captor = ArgumentCaptor.forClass(TextMessage.class);
     verify(session, times(1)).sendMessage(captor.capture());
     return captor.getValue();

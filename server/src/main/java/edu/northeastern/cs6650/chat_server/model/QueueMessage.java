@@ -45,12 +45,6 @@ public class QueueMessage {
   }
 
   /**
-   * Default constructor for QueueMessage (required for JSON deserialization).
-   */
-  public QueueMessage() {
-  }
-
-  /**
    * Get the unique message ID.
    * @return messageId string
    */
