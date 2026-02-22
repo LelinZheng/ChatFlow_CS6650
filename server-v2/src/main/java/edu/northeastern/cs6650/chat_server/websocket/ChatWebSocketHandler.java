@@ -2,6 +2,7 @@ package edu.northeastern.cs6650.chat_server.websocket;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.MessageProperties;
+import edu.northeastern.cs6650.chat_server.circuitbreaker.CircuitBreaker;
 import edu.northeastern.cs6650.chat_server.config.ChannelPool;
 import edu.northeastern.cs6650.chat_server.config.RabbitMQConfig;
 import edu.northeastern.cs6650.chat_server.model.ClientMessage;
@@ -39,11 +40,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
   private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
 
-  private final AtomicInteger failureCount = new AtomicInteger(0);
-
-  private volatile boolean circuitOpen = false;
-
-  private static final int FAILURE_THRESHOLD = 5;
+  private final CircuitBreaker circuitBreaker = new CircuitBreaker(
+      5, 30_000);
 
   /**
    * Constructor for ChatWebSocketHandler.
@@ -64,24 +62,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     System.out.println("New WebSocket connection established: " + session.getId());
   }
 
-
-  /*
-   * Circuit Breaker (simplified, no half-open state)
-   *
-   * Tracks consecutive RabbitMQ publish failures. If FAILURE_THRESHOLD failures
-   * occur in a row with no successes in between, circuitOpen is set to true and
-   * all subsequent messages are rejected immediately with SERVICE_UNAVAILABLE
-   * without attempting to contact RabbitMQ.
-   *
-   * A successful publish resets failureCount to 0.
-   *
-   * Note: This implementation does not include a half-open state (where the circuit
-   * periodically allows one test message through to check if RabbitMQ has recovered).
-   * The circuit remains open until the server restarts. This is intentional for
-   * simplicity — in a production system, half-open recovery would be implemented
-   * using a scheduled task or timeout-based reset.
-   */
-
   /**
    * Processes an incoming WebSocket text message.
    * <p>
@@ -89,12 +69,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
    * <ol>
    *   <li>Deserialize JSON payload into {@link ClientMessage}</li>
    *   <li>Validate fields via {@link MessageValidator}</li>
-   *   <li>If the circuit breaker is open (too many recent RabbitMQ failures), drop the message</li>
+   *   <li>Check the circuit breaker — if OPEN or HALF_OPEN (non-probe thread),
+   *       reject immediately with {@code SERVICE_UNAVAILABLE}</li>
    *   <li>Publish a {@link QueueMessage} to RabbitMQ on routing key {@code room.{roomId}}</li>
    * </ol>
    * Validation or JSON errors are sent back to the client as {@link ErrorResponse}.
-   * Failed publishes increment the circuit breaker failure count. Successful publishes reset it.
-   * If the circuit breaker threshold is reached, messages are dropped until the server restarts.
+   * Publish failures are reported as {@code PUBLISH_FAILED} and recorded in the circuit breaker.
+   * After 5 consecutive failures the circuit opens; after 30 seconds one probe is allowed
+   * through — if it succeeds the circuit closes and normal operation resumes automatically.
    *
    * @param session the sender's WebSocket session
    * @param message the raw text frame received
@@ -129,7 +111,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     // Check circuit breaker before attempting to publish
-    if (circuitOpen) {
+    if (!circuitBreaker.allowRequest()) {
       log.warn("Circuit breaker open — dropping message for room {}", clientMessage.getRoomId());
       ErrorResponse circuitErr = new ErrorResponse(
           "SERVICE_UNAVAILABLE",
@@ -165,21 +147,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
           MessageProperties.PERSISTENT_TEXT_PLAIN,
           json.getBytes(StandardCharsets.UTF_8)
       );
-      // Reset failure count only on success
-      failureCount.set(0);
+      circuitBreaker.recordSuccess(); // reset failure count on success
 
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       log.error("Interrupted while borrowing channel for session {}", session.getId());
 
     } catch (Exception e) {
-      // Increment failure count and open circuit if threshold reached
-      int failures = failureCount.incrementAndGet();
-      if (failures >= FAILURE_THRESHOLD) {
-        circuitOpen = true;
-        log.error("Circuit breaker OPEN after {} consecutive failures — messages will be dropped",
-            failures);
-      }
+      circuitBreaker.recordFailure();
       log.error("Failed to publish message to room {}: {}", clientMessage.getRoomId(),
           e.getMessage());
       // Notify client that their message was not delivered
@@ -188,7 +163,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
           "Failed to deliver message, please try again",
           List.of(e.getMessage()));
       session.sendMessage(new TextMessage(objectMapper.writeValueAsString(publishErr)));
-
     } finally {
       // Always return channel to pool regardless of success or failure
       channelPool.returnChannel(channel);
