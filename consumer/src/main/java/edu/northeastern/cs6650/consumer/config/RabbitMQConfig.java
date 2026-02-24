@@ -1,5 +1,6 @@
 package edu.northeastern.cs6650.consumer.config;
 
+import edu.northeastern.cs6650.consumer.consumer.ConsumerThreadPool;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
@@ -12,11 +13,26 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
+/**
+ * Spring configuration class that manages the RabbitMQ connection lifecycle
+ * for the consumer application.
+ *
+ * <p>
+ * On startup, establishes a single shared TCP connection to RabbitMQ with
+ * automatic recovery enabled. Re-declares the topic exchange and all 20 room
+ * queues defensively in case the consumer starts before the server.
+ * Exposes consumer tuning parameters (thread count, prefetch count) read from
+ * {@code application.properties}.
+ * </p>
+ */
 @Configuration
 public class RabbitMQConfig {
   private static final Logger log = LoggerFactory.getLogger(RabbitMQConfig.class);
 
+  /** Name of the topic exchange all room messages are published to. */
   public static final String EXCHANGE_NAME = "chat.exchange";
+
+  /** Total number of chat rooms, each backed by its own RabbitMQ queue. */
   public static final int NUM_ROOMS = 20;
 
   @Value("${rabbitmq.host:localhost}")
@@ -39,9 +55,40 @@ public class RabbitMQConfig {
 
   private Connection connection;
 
+  /**
+   * Returns the number of consumer threads to spin up.
+   * Configured via {@code consumer.thread.count} in application.properties.
+   *
+   * @return consumer thread count
+   */
   public int getConsumerThreadCount() { return consumerThreadCount; }
+
+  /**
+   * Returns the RabbitMQ prefetch count (max unacknowledged messages per channel).
+   * Controls backpressure — RabbitMQ will not push more than this many messages
+   * to a consumer before some are acknowledged.
+   * Configured via {@code consumer.prefetch.count} in application.properties.
+   *
+   * @return prefetch count
+   */
   public int getPrefetchCount() { return prefetchCount; }
 
+  /**
+   * Initializes the RabbitMQ connection and verifies exchange and queue topology.
+   * <p>
+   * Automatic recovery is enabled so the connection self-heals if RabbitMQ
+   * drops and restarts. Re-declaration of exchange and queues is idempotent —
+   * RabbitMQ ignores re-declarations if settings already match.
+   * <p>
+   * Queue settings:
+   * <ul>
+   *   <li>60 second message TTL</li>
+   *   <li>10,000 message max length</li>
+   * </ul>
+   *
+   * @throws Exception if the connection or topology verification fails,
+   *                   aborting application startup
+   */
   @PostConstruct
   public void init() throws Exception {
     ConnectionFactory factory = new ConnectionFactory();
@@ -76,8 +123,20 @@ public class RabbitMQConfig {
     }
   }
 
+  /**
+   * Returns the shared RabbitMQ TCP connection.
+   * Used by {@link ConsumerThreadPool} to create per-thread channels.
+   *
+   * @return the active RabbitMQ {@link Connection}
+   */
   public Connection getConnection() { return connection; }
 
+  /**
+   * Closes the RabbitMQ connection on application shutdown.
+   * Triggered automatically by Spring before the bean is destroyed.
+   *
+   * @throws Exception if closing the connection fails
+   */
   @PreDestroy
   public void close() throws Exception {
     if (connection != null && connection.isOpen()) {

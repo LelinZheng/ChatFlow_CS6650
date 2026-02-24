@@ -56,8 +56,9 @@ public class RoomSessionHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Called when a client disconnects.
-   * Removes session from its room.
+   * Called when a client disconnects. Removes session from its room and cleans up maps.
+   * @param session the WebSocket session that was closed
+   * @param status the reason for closure (normal, error, etc.)
    */
   @Override
   public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
