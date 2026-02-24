@@ -17,6 +17,25 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.DependsOn;
 import org.springframework.stereotype.Component;
 
+/**
+ * Manages the pool of consumer threads and distributes room queues across them.
+ * <p>
+ * On startup, creates N threads (configurable via {@code consumer.thread.count})
+ * and assigns room queues round-robin. Each thread gets a dedicated RabbitMQ
+ * channel and runs a {@link RoomConsumer} that subscribes to its assigned queues.
+ * <p>
+ * Distribution examples:
+ * <pre>
+ *   10 threads → 2 rooms per thread
+ *   20 threads → 1 room per thread (maximum parallelism, ordering guaranteed)
+ *   40 threads → 2 threads per room (competing consumers, higher throughput,
+ *                                    no ordering guarantee within a room)
+ *   80 threads → 4 threads per room
+ * </pre>
+ * When thread count exceeds room count, extra threads mirror existing room
+ * assignments as competing consumers — RabbitMQ delivers each message to
+ * whichever thread is free first.
+ */
 @Component
 @DependsOn("rabbitMQConfig")
 public class ConsumerThreadPool {
@@ -27,11 +46,25 @@ public class ConsumerThreadPool {
   private final RoomSessionHandler roomSessionHandler;
   private ExecutorService executor;
 
+  /**
+   * Constructs the pool with its required dependencies.
+   *
+   * @param config             RabbitMQ config providing connection and tuning params
+   * @param roomSessionHandler handler that manages active WebSocket sessions per room
+   */
   public ConsumerThreadPool(RabbitMQConfig config, RoomSessionHandler roomSessionHandler) {
     this.config = config;
     this.roomSessionHandler = roomSessionHandler;
   }
 
+  /**
+   * Initializes the thread pool, distributes room queues, and starts all consumer threads.
+   * <p>
+   * Each thread receives a dedicated RabbitMQ channel with prefetch configured,
+   * ensuring backpressure is applied independently per thread.
+   *
+   * @throws Exception if channel creation fails
+   */
   @PostConstruct
   public void init() throws Exception {
     int threadCount = config.getConsumerThreadCount();
@@ -40,9 +73,6 @@ public class ConsumerThreadPool {
     executor = Executors.newFixedThreadPool(threadCount);
 
     // distribute rooms across threads: round-robin
-    // e.g. 10 threads → 2 rooms each, 20 threads → 1 room each
-    // 40+ threads → multiple threads per room (competing consumers,
-    //               higher throughput but no ordering guarantee)
     Map<Integer, List<String>> assignments = new HashMap<>();
     for (int roomId = 1; roomId <= totalRooms; roomId++) {
       int threadIndex = (roomId - 1) % threadCount;
@@ -80,6 +110,11 @@ public class ConsumerThreadPool {
     log.info("ConsumerThreadPool started: threads={} rooms={}", threadCount, totalRooms);
   }
 
+  /**
+   * Shuts down all consumer threads on application shutdown.
+   * Triggers {@link Thread#interrupt()} on all running threads,
+   * causing each {@link RoomConsumer} to exit its sleep loop cleanly.
+   */
   @PreDestroy
   public void shutdown() {
     executor.shutdownNow();
