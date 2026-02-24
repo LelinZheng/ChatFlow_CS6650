@@ -96,7 +96,7 @@ public class RoomConsumer implements Runnable {
    *
    * @param delivery the raw RabbitMQ delivery containing headers and body
    */
-  private void handleDelivery(Delivery delivery) {
+  void handleDelivery(Delivery delivery) {
     long deliveryTag = delivery.getEnvelope().getDeliveryTag();
 
     try {
