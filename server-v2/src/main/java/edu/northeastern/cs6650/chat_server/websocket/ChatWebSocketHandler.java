@@ -37,6 +37,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
   private final ChannelPool channelPool;
 
+  private final RoomManager roomManager;
+
   private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
 
   private final CircuitBreaker circuitBreaker = new CircuitBreaker(
@@ -46,19 +48,47 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
    * Constructor for ChatWebSocketHandler.
    * @param objectMapper the ObjectMapper for JSON processing
    * @param channelPool  pool of RabbitMQ channels for publishing messages
+   * @param roomManager  manages WebSocket sessions for broadcasting messages
    */
-  public ChatWebSocketHandler(ObjectMapper objectMapper, ChannelPool channelPool) {
-     this.channelPool = channelPool;
+  public ChatWebSocketHandler(ObjectMapper objectMapper, ChannelPool channelPool,
+      RoomManager roomManager) {
+    this.channelPool = channelPool;
     this.objectMapper = objectMapper;
+    this.roomManager = roomManager;
   }
 
   /**
-   * Logs new WebSocket connections.
+   * Registers the client's WebSocket session in the appropriate room.
+   * <p>
+   * Extracts the roomId from the session URI path (e.g. {@code /chat/5} → {@code "5"})
+   * and delegates to {@link RoomManager#addSession} to track the session.
+   * If the roomId cannot be extracted, the session is closed immediately.
    *
    * @param session the newly established WebSocket session
    */
   public void afterConnectionEstablished(WebSocketSession session) {
-    System.out.println("New WebSocket connection established: " + session.getId());
+    String roomId = extractRoomId(session);
+    if (roomId == null) {
+      log.warn("Could not extract roomId from session {}, closing", session.getId());
+      try { session.close(); } catch (Exception ignored) {}
+      return;
+    }
+    roomManager.addSession(roomId, session);
+  }
+
+  /**
+   * Extracts the roomId from the WebSocket session URI.
+   *
+   * @param session the WebSocket session to extract from
+   * @return the roomId string, or null if it cannot be extracted
+   */
+  private String extractRoomId(WebSocketSession session) {
+    try {
+      String path = session.getUri().getPath(); // e.g. /chat/5
+      return path.substring(path.lastIndexOf('/') + 1);
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   /**
@@ -169,12 +199,16 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Logs WebSocket connection closures.
+   * Removes the client's WebSocket session from its room on disconnect.
+   * Delegates to {@link RoomManager#removeSession} which looks up the room
+   * from the session ID and cleans up both internal maps.
    *
    * @param session the closed WebSocket session
    * @param status  the close status code and reason
    */
+  @Override
   public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
+    roomManager.removeSession(session);
     System.out.println("WebSocket connection closed: " + session.getId());
   }
 
