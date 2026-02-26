@@ -3,7 +3,7 @@ package edu.northeastern.cs6650.consumer.consumer;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Delivery;
 import edu.northeastern.cs6650.consumer.model.ChatMessage;
-import edu.northeastern.cs6650.consumer.websocket.RoomSessionHandler;
+import edu.northeastern.cs6650.consumer.config.ServerRegistry;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -13,18 +13,21 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * A single consumer thread that subscribes to assigned RabbitMQ room queues,
- * broadcasts messages to connected WebSocket clients, and acknowledges delivery.
+ * fans out messages to all chat server instances, and acknowledges delivery.
  * <p>
  * Each instance owns a dedicated RabbitMQ channel. On {@link #run()}, it registers
  * push-based delivery callbacks via {@code basicConsume} for each assigned queue,
  * then enters a sleep loop to stay alive while RabbitMQ fires callbacks asynchronously.
  * <p>
+ * In Design B, broadcasting is done by calling {@link ServerRegistry#broadcastToAll},
+ * which posts the message to every server instance's {@code /internal/broadcast} endpoint.
+ * Each server then delivers the message to its locally connected WebSocket sessions.
+ * <p>
  * Delivery guarantees:
  * <ul>
- *   <li>At-least-once: only acknowledges after successful broadcast</li>
+ *   <li>At-least-once: only acknowledges after successful broadcast to all servers</li>
  *   <li>Retry with exponential backoff: up to 3 attempts on broadcast failure</li>
  *   <li>Duplicate detection: messageId cache prevents reprocessing redelivered messages</li>
- *   <li>Dead session cleanup: handled inside {@link RoomSessionHandler#broadcastToRoom}</li>
  * </ul>
  */
 public class RoomConsumer implements Runnable {
@@ -36,7 +39,7 @@ public class RoomConsumer implements Runnable {
 
   private final Channel channel;
   private final List<String> assignedQueues;
-  private final RoomSessionHandler roomSessionHandler;
+  private final ServerRegistry serverRegistry;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   // duplicate detection: messageId -> time delivered
@@ -45,15 +48,15 @@ public class RoomConsumer implements Runnable {
   /**
    * Constructs a consumer for the given set of queues.
    *
-   * @param channel            dedicated RabbitMQ channel for this thread
-   * @param assignedQueues     list of queue names this consumer subscribes to (e.g. "room.1")
-   * @param roomSessionHandler used to broadcast messages to connected WebSocket sessions
+   * @param channel        dedicated RabbitMQ channel for this thread
+   * @param assignedQueues list of queue names this consumer subscribes to (e.g. "room.1")
+   * @param serverRegistry registry used to fan out messages to all server instances
    */
   public RoomConsumer(Channel channel, List<String> assignedQueues,
-      RoomSessionHandler roomSessionHandler) {
+      ServerRegistry serverRegistry) {
     this.channel = channel;
     this.assignedQueues = assignedQueues;
-    this.roomSessionHandler = roomSessionHandler;
+    this.serverRegistry = serverRegistry;
   }
 
   /**
@@ -67,18 +70,16 @@ public class RoomConsumer implements Runnable {
   @Override
   public void run() {
     try {
-      // subscribe to all assigned queues on this channel
       for (String queue : assignedQueues) {
-        channel.basicConsume(queue, false, // false = manual ack
+        channel.basicConsume(queue, false,
             (consumerTag, delivery) -> handleDelivery(delivery),
             consumerTag -> log.warn("Consumer cancelled for tag: {}", consumerTag));
       }
       log.info("RoomConsumer subscribed to: {}", assignedQueues);
 
-      // enters sleep loop to stay alive and periodically evict old entries from the duplicate cache
       while (!Thread.currentThread().isInterrupted()) {
         Thread.sleep(1000);
-        evictOldEntries(); // periodic cleanup of duplicate cache
+        evictOldEntries();
       }
 
     } catch (InterruptedException e) {
@@ -102,10 +103,9 @@ public class RoomConsumer implements Runnable {
     try {
       ChatMessage msg = objectMapper.readValue(delivery.getBody(), ChatMessage.class);
 
-      // duplicate check
       if (isDuplicate(msg.getMessageId())) {
         log.debug("Duplicate message {} detected, skipping", msg.getMessageId());
-        channel.basicAck(deliveryTag, false); // ack so it leaves the queue
+        channel.basicAck(deliveryTag, false);
         return;
       }
 
@@ -119,26 +119,26 @@ public class RoomConsumer implements Runnable {
   }
 
   /**
-   * Broadcasts a message to all WebSocket sessions in the target room,
+   * Fans out a message to all server instances via {@link ServerRegistry#broadcastToAll},
    * retrying up to {@link #MAX_RETRIES} times with exponential backoff on failure.
    * Acknowledges to RabbitMQ on success, nacks without requeue after all retries exhausted.
    *
    * @param roomId      the room to broadcast to
-   * @param payload     the raw JSON string to send to clients
+   * @param payload     the raw JSON string to send to all server instances
    * @param deliveryTag RabbitMQ delivery tag used for ack/nack
    */
   private void broadcastWithRetry(String roomId, String payload, long deliveryTag) {
     int attempt = 0;
     while (attempt < MAX_RETRIES) {
       try {
-        roomSessionHandler.broadcastToRoom(roomId, payload);
-        ack(deliveryTag); // success — tell RabbitMQ we're done
+        serverRegistry.broadcastToAll(roomId, payload);
+        ack(deliveryTag);
         return;
       } catch (Exception e) {
         attempt++;
         if (attempt == MAX_RETRIES) {
           log.error("Broadcast to room {} failed after {} attempts", roomId, MAX_RETRIES);
-          nack(deliveryTag); // give up — RabbitMQ will discard (no requeue)
+          nack(deliveryTag);
           return;
         }
         long backoff = BASE_BACKOFF_MS * (1L << attempt); // 200ms, 400ms, 800ms
@@ -176,7 +176,7 @@ public class RoomConsumer implements Runnable {
    */
   private void nack(long deliveryTag) {
     try {
-      channel.basicNack(deliveryTag, false, false); // false = don't requeue
+      channel.basicNack(deliveryTag, false, false);
     } catch (Exception e) {
       log.error("Failed to nack delivery {}: {}", deliveryTag, e.getMessage());
     }
@@ -191,8 +191,7 @@ public class RoomConsumer implements Runnable {
    */
   private boolean isDuplicate(String messageId) {
     if (messageId == null) return false;
-    return recentlyDelivered.putIfAbsent(
-        messageId, System.currentTimeMillis()) != null;
+    return recentlyDelivered.putIfAbsent(messageId, System.currentTimeMillis()) != null;
   }
 
   /**
@@ -201,7 +200,7 @@ public class RoomConsumer implements Runnable {
    * unbounded memory growth.
    */
   private void evictOldEntries() {
-    long cutoff = System.currentTimeMillis() - 60_000; // evict after 60s
+    long cutoff = System.currentTimeMillis() - 60_000;
     recentlyDelivered.entrySet().removeIf(e -> e.getValue() < cutoff);
   }
 }

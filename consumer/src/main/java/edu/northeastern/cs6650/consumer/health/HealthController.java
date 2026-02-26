@@ -1,6 +1,6 @@
 package edu.northeastern.cs6650.consumer.health;
 
-import edu.northeastern.cs6650.consumer.websocket.RoomSessionHandler;
+import edu.northeastern.cs6650.consumer.config.ServerRegistry;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>
  * {@code GET /health} is used by the AWS ALB to verify the consumer is alive.
  * {@code GET /health/stats} is called by monitoring scripts during load tests
- * to collect active room and session counts alongside RabbitMQ queue metrics.
+ * to collect consumer state alongside RabbitMQ queue metrics.
  */
 @RestController
 @RequestMapping("/health")
@@ -24,10 +24,10 @@ public class HealthController {
 
   private static final Logger log = LoggerFactory.getLogger(HealthController.class);
 
-  private final RoomSessionHandler roomSessionHandler;
+  private final ServerRegistry serverRegistry;
 
-  public HealthController(RoomSessionHandler roomSessionHandler) {
-    this.roomSessionHandler = roomSessionHandler;
+  public HealthController(ServerRegistry serverRegistry) {
+    this.serverRegistry = serverRegistry;
   }
 
   /**
@@ -43,15 +43,17 @@ public class HealthController {
   }
 
   /**
-   * Detailed stats — called by your monitoring script during load tests.
+   * Detailed stats — called by monitoring scripts during load tests.
+   * Reports registered server instances so you can verify all servers
+   * are known to the consumer at test time.
    */
   @GetMapping("/stats")
   public ResponseEntity<Map<String, Object>> stats() {
     Map<String, Object> response = new LinkedHashMap<>();
     response.put("status", "UP");
     response.put("timestamp", Instant.now().toString());
-    response.put("activeRooms", roomSessionHandler.getActiveRoomCount());
-    response.put("totalSessions", roomSessionHandler.getTotalSessionCount());
+    response.put("serverInstances", serverRegistry.getServerInstances());
+    response.put("serverCount", serverRegistry.getServerInstances().size());
     return ResponseEntity.ok(response);
   }
 }
