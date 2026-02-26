@@ -10,13 +10,12 @@ class ServerRegistryTest {
 
   private void initRegistry(String instances) throws Exception {
     registry = new ServerRegistry();
-    // inject @Value field directly via reflection
     java.lang.reflect.Field f = ServerRegistry.class.getDeclaredField("serverInstances");
     f.setAccessible(true);
     f.set(registry, instances);
     registry.init();
   }
-  
+
   @Test
   void init_singleInstance_parsesCorrectly() throws Exception {
     initRegistry("http://172.31.1.1:8080");
@@ -43,6 +42,8 @@ class ServerRegistryTest {
         registry.getServerInstances().add("http://malicious:8080"));
   }
 
+  // verifying it does not throw even when servers are unreachable
+  // failures should be swallowed and logged.
   @Test
   void broadcastToAll_unreachableServer_doesNotThrow() throws Exception {
     initRegistry("http://localhost:19999"); // nothing running here
@@ -64,7 +65,6 @@ class ServerRegistryTest {
     // Both unreachable but the point is neither failure stops the other
     initRegistry("http://localhost:19999,http://localhost:19998");
 
-    // Should complete without throwing even though both fail
     assertDoesNotThrow(() ->
         registry.broadcastToAll("5", "payload"));
   }
