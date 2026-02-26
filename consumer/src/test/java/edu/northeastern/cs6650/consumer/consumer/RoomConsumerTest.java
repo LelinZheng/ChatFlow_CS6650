@@ -14,8 +14,8 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Delivery;
 import com.rabbitmq.client.Envelope;
+import edu.northeastern.cs6650.consumer.config.ServerRegistry;
 import edu.northeastern.cs6650.consumer.model.ChatMessage;
-import edu.northeastern.cs6650.consumer.websocket.RoomSessionHandler;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
@@ -24,25 +24,19 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
 
+
 class RoomConsumerTest {
 
   private final ObjectMapper mapper = new ObjectMapper();
 
   private Channel mockChannel;
-  private RoomSessionHandler mockSessionHandler;
+  private ServerRegistry mockServerRegistry;
   private RoomConsumer consumer;
 
   private String validPayload(String messageId, String roomId) throws Exception {
     ChatMessage msg = new ChatMessage(
-        messageId,
-        roomId,
-        "1",
-        "user1",
-        "hello",
-        Instant.now().toString(),
-        "TEXT",
-        "server-1",
-        "127.0.0.1"
+        messageId, roomId, "1", "user1", "hello",
+        Instant.now().toString(), "TEXT", "server-1", "127.0.0.1"
     );
     return mapper.writeValueAsString(msg);
   }
@@ -56,8 +50,8 @@ class RoomConsumerTest {
   @BeforeEach
   void setUp() {
     mockChannel = mock(Channel.class);
-    mockSessionHandler = mock(RoomSessionHandler.class);
-    consumer = new RoomConsumer(mockChannel, List.of("room.5"), mockSessionHandler);
+    mockServerRegistry = mock(ServerRegistry.class);
+    consumer = new RoomConsumer(mockChannel, List.of("room.5"), mockServerRegistry);
   }
 
   // ── successful delivery ────────────────────────────────────
@@ -69,7 +63,7 @@ class RoomConsumerTest {
 
     consumer.handleDelivery(delivery);
 
-    verify(mockSessionHandler).broadcastToRoom("5", payload);
+    verify(mockServerRegistry).broadcastToAll("5", payload);
     verify(mockChannel).basicAck(1L, false);
     verify(mockChannel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
   }
@@ -84,7 +78,7 @@ class RoomConsumerTest {
     consumer.handleDelivery(delivery);
     consumer.handleDelivery(delivery);
 
-    verify(mockSessionHandler, times(1)).broadcastToRoom(any(), any());
+    verify(mockServerRegistry, times(1)).broadcastToAll(any(), any());
     verify(mockChannel, times(2)).basicAck(anyLong(), eq(false));
   }
 
@@ -96,7 +90,7 @@ class RoomConsumerTest {
 
     consumer.handleDelivery(delivery);
 
-    verify(mockSessionHandler, never()).broadcastToRoom(any(), any());
+    verify(mockServerRegistry, never()).broadcastToAll(any(), any());
     verify(mockChannel).basicNack(1L, false, false);
   }
 
@@ -105,15 +99,14 @@ class RoomConsumerTest {
   @Test
   void handleDelivery_broadcastFailsAllRetries_nacks() throws Exception {
     doThrow(new RuntimeException("broadcast failed"))
-        .when(mockSessionHandler).broadcastToRoom(any(), any());
+        .when(mockServerRegistry).broadcastToAll(any(), any());
 
     String payload = validPayload("msg-2", "5");
     Delivery delivery = mockDelivery(2L, payload);
 
     consumer.handleDelivery(delivery);
 
-    // retried MAX_RETRIES times
-    verify(mockSessionHandler, times(3)).broadcastToRoom(any(), any());
+    verify(mockServerRegistry, times(3)).broadcastToAll(any(), any());
     verify(mockChannel).basicNack(2L, false, false);
     verify(mockChannel, never()).basicAck(anyLong(), anyBoolean());
   }
@@ -122,14 +115,14 @@ class RoomConsumerTest {
   void handleDelivery_broadcastFailsThenSucceeds_acks() throws Exception {
     doThrow(new RuntimeException("transient error"))
         .doNothing()
-        .when(mockSessionHandler).broadcastToRoom(any(), any());
+        .when(mockServerRegistry).broadcastToAll(any(), any());
 
     String payload = validPayload("msg-3", "5");
     Delivery delivery = mockDelivery(3L, payload);
 
     consumer.handleDelivery(delivery);
 
-    verify(mockSessionHandler, times(2)).broadcastToRoom(any(), any());
+    verify(mockServerRegistry, times(2)).broadcastToAll(any(), any());
     verify(mockChannel).basicAck(3L, false);
     verify(mockChannel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
   }
