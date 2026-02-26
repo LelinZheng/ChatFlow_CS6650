@@ -9,9 +9,13 @@ import edu.northeastern.cs6650.chat_server.circuitbreaker.CircuitBreaker;
 import edu.northeastern.cs6650.chat_server.config.ChannelPool;
 import edu.northeastern.cs6650.chat_server.config.RabbitMQConfig;
 import java.net.InetSocketAddress;
+import java.net.URI;
 import java.time.Instant;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import tools.jackson.databind.ObjectMapper;
@@ -20,6 +24,12 @@ import tools.jackson.databind.JsonNode;
 class ChatWebSocketHandlerTest {
 
   private final ObjectMapper mapper = new ObjectMapper();
+  private RoomManager mockRoomManager;
+
+  @BeforeEach
+  void setUp() {
+    mockRoomManager = mock(RoomManager.class);
+  }
 
   private ChannelPool mockChannelPool() throws Exception {
     Channel mockChannel = mock(Channel.class);
@@ -30,6 +40,8 @@ class ChatWebSocketHandlerTest {
 
   private WebSocketSession mockSession() throws Exception {
     WebSocketSession session = mock(WebSocketSession.class);
+    when(session.getId()).thenReturn(UUID.randomUUID().toString());
+    when(session.getUri()).thenReturn(new URI("ws://localhost:8080/chat/5"));
     when(session.getLocalAddress()).thenReturn(new InetSocketAddress("localhost", 8080));
     when(session.getRemoteAddress()).thenReturn(new InetSocketAddress("127.0.0.1", 54321));
     return session;
@@ -48,11 +60,45 @@ class ChatWebSocketHandlerTest {
             """.formatted(Instant.now().toString());
   }
 
+  // ── connection lifecycle ───────────────────────────────────
+
+  @Test
+  void afterConnectionEstablished_validRoom_addsSessionToRoomManager() throws Exception {
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    WebSocketSession session = mockSession();
+
+    handler.afterConnectionEstablished(session);
+
+    verify(mockRoomManager).addSession("5", session);
+  }
+
+  @Test
+  void afterConnectionEstablished_invalidUri_closesSession() throws Exception {
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    WebSocketSession session = mock(WebSocketSession.class);
+    when(session.getUri()).thenReturn(null); // simulate bad URI
+
+    handler.afterConnectionEstablished(session);
+
+    verify(session).close();
+    verify(mockRoomManager, never()).addSession(any(), any());
+  }
+
+  @Test
+  void afterConnectionClosed_removesSessionFromRoomManager() throws Exception {
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    WebSocketSession session = mockSession();
+
+    handler.afterConnectionClosed(session, CloseStatus.NORMAL);
+
+    verify(mockRoomManager).removeSession(session);
+  }
+
   // ── JSON / validation errors ───────────────────────────────
 
   @Test
   void handleTextMessage_invalidJson_sendsInvalidJsonError() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool());
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage("{not valid json"));
@@ -63,7 +109,7 @@ class ChatWebSocketHandlerTest {
 
   @Test
   void handleTextMessage_validationFailed_sendsValidationFailedError() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool());
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
     WebSocketSession session = mockSession();
 
     String payload = """
@@ -94,7 +140,7 @@ class ChatWebSocketHandlerTest {
     ChannelPool mockPool = mock(ChannelPool.class);
     when(mockPool.borrowChannel()).thenReturn(mockChannel);
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage(validPayload()));
@@ -117,14 +163,14 @@ class ChatWebSocketHandlerTest {
     doThrow(new RuntimeException("publish failed"))
         .when(mockChannel).basicPublish(any(), any(), any(), any());
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
     WebSocketSession session = mockSession();
 
     assertDoesNotThrow(() -> handler.handleTextMessage(session, new TextMessage(validPayload())));
     verify(mockPool).returnChannel(mockChannel);
   }
 
-  // ── circuit breaker integration ────────────────────────────
+  // ── circuit breaker ────────────────────────────────────────
 
   @Test
   void handleTextMessage_publishFailure_sendsPublishFailedError() throws Exception {
@@ -134,7 +180,7 @@ class ChatWebSocketHandlerTest {
     doThrow(new RuntimeException("connection refused"))
         .when(mockChannel).basicPublish(any(), any(), any(), any());
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage(validPayload()));
@@ -151,9 +197,8 @@ class ChatWebSocketHandlerTest {
     doThrow(new RuntimeException("rabbitmq down"))
         .when(mockChannel).basicPublish(any(), any(), any(), any());
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
 
-    // Send 5 messages to trip the default threshold (5 consecutive failures)
     for (int i = 0; i < 5; i++) {
       handler.handleTextMessage(mockSession(), new TextMessage(validPayload()));
     }
