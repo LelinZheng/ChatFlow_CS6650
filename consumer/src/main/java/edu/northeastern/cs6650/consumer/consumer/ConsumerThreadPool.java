@@ -1,9 +1,8 @@
 package edu.northeastern.cs6650.consumer.consumer;
 
-
 import com.rabbitmq.client.Channel;
 import edu.northeastern.cs6650.consumer.config.RabbitMQConfig;
-import edu.northeastern.cs6650.consumer.websocket.RoomSessionHandler;
+import edu.northeastern.cs6650.consumer.config.ServerRegistry;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.ArrayList;
@@ -35,6 +34,10 @@ import org.springframework.stereotype.Component;
  * When thread count exceeds room count, extra threads mirror existing room
  * assignments as competing consumers — RabbitMQ delivers each message to
  * whichever thread is free first.
+ * <p>
+ * In Design B, each {@link RoomConsumer} calls {@link ServerRegistry} to fan out
+ * messages to all server instances via their internal broadcast endpoints,
+ * rather than maintaining WebSocket sessions directly.
  */
 @Component
 @DependsOn("rabbitMQConfig")
@@ -43,18 +46,18 @@ public class ConsumerThreadPool {
   private static final Logger log = LoggerFactory.getLogger(ConsumerThreadPool.class);
 
   private final RabbitMQConfig config;
-  private final RoomSessionHandler roomSessionHandler;
+  private final ServerRegistry serverRegistry;
   private ExecutorService executor;
 
   /**
    * Constructs the pool with its required dependencies.
    *
-   * @param config             RabbitMQ config providing connection and tuning params
-   * @param roomSessionHandler handler that manages active WebSocket sessions per room
+   * @param config         RabbitMQ config providing connection and tuning params
+   * @param serverRegistry registry of chat server instances to fan out broadcasts to
    */
-  public ConsumerThreadPool(RabbitMQConfig config, RoomSessionHandler roomSessionHandler) {
+  public ConsumerThreadPool(RabbitMQConfig config, ServerRegistry serverRegistry) {
     this.config = config;
-    this.roomSessionHandler = roomSessionHandler;
+    this.serverRegistry = serverRegistry;
   }
 
   /**
@@ -72,7 +75,6 @@ public class ConsumerThreadPool {
 
     executor = Executors.newFixedThreadPool(threadCount);
 
-    // distribute rooms across threads: round-robin
     Map<Integer, List<String>> assignments = new HashMap<>();
     for (int roomId = 1; roomId <= totalRooms; roomId++) {
       int threadIndex = (roomId - 1) % threadCount;
@@ -80,11 +82,9 @@ public class ConsumerThreadPool {
           .add("room." + roomId);
     }
 
-    // for threads > NUM_ROOMS, extra threads share rooms with existing threads
-    // e.g. 40 threads, 20 rooms: thread 0 and thread 20 both get room.1
     if (threadCount > totalRooms) {
       for (int i = totalRooms; i < threadCount; i++) {
-        int mirrorIndex = i % totalRooms; // mirror onto existing room assignments
+        int mirrorIndex = i % totalRooms;
         List<String> sharedQueues = assignments.get(mirrorIndex);
         assignments.put(i, new ArrayList<>(sharedQueues));
       }
@@ -100,8 +100,7 @@ public class ConsumerThreadPool {
       Channel channel = config.getConnection().createChannel();
       channel.basicQos(config.getPrefetchCount());
 
-      RoomConsumer consumer = new RoomConsumer(
-          channel, assignedQueues, roomSessionHandler);
+      RoomConsumer consumer = new RoomConsumer(channel, assignedQueues, serverRegistry);
       executor.submit(consumer);
 
       log.info("Thread {} assigned queues: {}", i, assignedQueues);
