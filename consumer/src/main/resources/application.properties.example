@@ -1,0 +1,15 @@
+# Server
+server.port=8081
+
+# Chat server instances the consumer calls back to
+chatserver.instances=http://localhost:8080
+
+# RabbitMQ
+rabbitmq.host=localhost
+rabbitmq.port=5672
+rabbitmq.username=your_username
+rabbitmq.password=your_password
+
+# Consumer tuning
+consumer.thread.count=10
+consumer.prefetch.count=10
