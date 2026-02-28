@@ -16,13 +16,14 @@ public class HealthController {
 
   /**
    * Health check endpoint.
-   * @return a map containing the health status and current timestamp
+   * @return a map containing the health status and current timestamp and the server name 
    */
   @GetMapping("/health")
   public Map<String, Object> health() {
     return Map.of(
         "status", "UP",
-        "timestamp", Instant.now().toString()
+        "timestamp", Instant.now().toString(),
+        "serverId", System.getenv().getOrDefault("SERVER_ID", "unknown")
     );
   }
 }
