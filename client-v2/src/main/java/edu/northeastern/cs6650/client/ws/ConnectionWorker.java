@@ -10,7 +10,6 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.handshake.ServerHandshake;
 
@@ -255,7 +254,7 @@ public class ConnectionWorker implements Runnable {
             msg.getMessageType(),
             -1,
             "NO_CONNECTION",
-            msg.getRoomId()
+            Integer.parseInt(msg.getRoomId())
         ));
       }
       if (drained > 0) {
@@ -334,7 +333,7 @@ public class ConnectionWorker implements Runnable {
                   message.getMessageType(),
                   latencyMillis,
                   "OK",
-                  message.getRoomId()
+                  Integer.parseInt(message.getRoomId())
               )
           );
           return true;
@@ -361,7 +360,7 @@ public class ConnectionWorker implements Runnable {
           message.getMessageType(),
           -1,
           "FAILED_AFTER_RETRIES",
-          message.getRoomId()
+          Integer.parseInt(message.getRoomId())
       ));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();

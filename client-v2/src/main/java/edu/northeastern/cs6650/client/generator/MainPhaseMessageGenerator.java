@@ -64,7 +64,7 @@ public class MainPhaseMessageGenerator implements Runnable {
         ChatMessage msg = producer.createMessage();
 
         int roomId = pickRoomId();
-        msg.setRoomId(roomId);
+        msg.setRoomId(String.valueOf(roomId));
 
         int offset = roundRobinCounters[roomId].getAndIncrement() % connsPerRoom;
         int workerIndex = (roomId - 1) * connsPerRoom + offset;

@@ -7,9 +7,9 @@ package edu.northeastern.cs6650.client.model;
  * <p>This object models the JSON payload required by the server API, including
  * user identity, message content, message type, and timestamp.</p>
  *
- * <p>Some fields (e.g. {@code messageId}, {@code roomId}) are used only for
- * client-side routing, tracking, and termination signaling and are excluded
- * from JSON serialization.</p>
+ * <p>All fields including {@code messageId} and {@code roomId} are included
+ * in the JSON payload sent to the server, as the server requires them for
+ * deduplication and room routing.</p>
  */
 public class ChatMessage {
   private String messageId;
