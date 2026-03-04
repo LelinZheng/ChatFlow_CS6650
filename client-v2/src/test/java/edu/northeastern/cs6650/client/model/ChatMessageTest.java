@@ -17,7 +17,7 @@ class ChatMessageTest {
     assertNull(message.getMessage());
     assertNull(message.getMessageType());
     assertNull(message.getTimestamp());
-    assertEquals(0, message.getRoomId());
+    assertNull(message.getRoomId());
   }
 
   @Test
@@ -28,7 +28,7 @@ class ChatMessageTest {
         "Hello World",
         MessageType.TEXT,
         "2024-01-01T12:00:00Z",
-        5
+        "5"
     );
 
     assertEquals("12345", message.getUserId());
@@ -36,7 +36,7 @@ class ChatMessageTest {
     assertEquals("Hello World", message.getMessage());
     assertEquals(MessageType.TEXT, message.getMessageType());
     assertEquals("2024-01-01T12:00:00Z", message.getTimestamp());
-    assertEquals(5, message.getRoomId());
+    assertEquals("5", message.getRoomId());
   }
 
   @Test
@@ -49,7 +49,7 @@ class ChatMessageTest {
     message.setMessageType(MessageType.JOIN);
     message.setTimestamp("2024-01-02T10:30:00Z");
     message.setMessageId("msg-123");
-    message.setRoomId(10);
+    message.setRoomId("10");
 
     assertEquals("67890", message.getUserId());
     assertEquals("user67890", message.getUsername());
@@ -57,7 +57,7 @@ class ChatMessageTest {
     assertEquals(MessageType.JOIN, message.getMessageType());
     assertEquals("2024-01-02T10:30:00Z", message.getTimestamp());
     assertEquals("msg-123", message.getMessageId());
-    assertEquals(10, message.getRoomId());
+    assertEquals("10", message.getRoomId());
   }
 
   @Test
