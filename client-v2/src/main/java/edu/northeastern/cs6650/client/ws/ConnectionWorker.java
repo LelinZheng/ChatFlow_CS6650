@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.northeastern.cs6650.client.metrics.MetricRecord;
 import edu.northeastern.cs6650.client.model.ChatMessage;
+import edu.northeastern.cs6650.client.model.MessageType;
+import edu.northeastern.cs6650.client.util.RoomMembershipTracker;
 import java.net.URI;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -22,6 +24,12 @@ import org.java_websocket.handshake.ServerHandshake;
  * This guarantees at most one in-flight message per connection and enables
  * accurate latency measurement.</p>
  *
+ * <p>Before dispatching each message the worker validates room membership
+ * against the shared {@link RoomMembershipTracker}. This is a concurrent-safe
+ * runtime gate that protects against out-of-order processing across workers
+ * (e.g., a LEAVE processed before a TEXT for the same user/room). Messages that
+ * fail the check are counted as failures and recorded with status
+ * {@code INVALID_MEMBERSHIP} in the metrics queue.</p>
  */
 public class ConnectionWorker implements Runnable {
 
@@ -46,28 +54,32 @@ public class ConnectionWorker implements Runnable {
   private final long echoTimeoutMs;
 
   BlockingQueue<MetricRecord> metricsQueue;
+  private final RoomMembershipTracker membershipTracker;
 
   /**
    * Creates a connection worker that owns a single persistent WebSocket connection
-   * and consumes messages from the provided queue.
+   * and consumes messages from the provided shared queue.
    *
-   * @param outbound queue from which messages are consumed
-   * @param serverUri WebSocket endpoint URI (e.g., {@code ws://host:port/chat/{roomId}})
-   * @param maxRetries maximum number of send/echo attempts per message before counting it as failed
-   * @param echoTimeoutMs maximum time to wait for an echo acknowledgement per message (milliseconds)
-   * @param metricsQueue queue to which metric records are published
+   * @param outbound          shared queue from which messages are consumed
+   * @param serverUri         WebSocket endpoint URI (e.g., {@code ws://host/chat})
+   * @param maxRetries        maximum send/echo attempts per message before counting as failed
+   * @param echoTimeoutMs     maximum time to wait for an echo acknowledgement (milliseconds)
+   * @param metricsQueue      queue to which metric records are published
+   * @param membershipTracker shared tracker for concurrent runtime membership validation
    */
   public ConnectionWorker(BlockingQueue<ChatMessage> outbound,
       URI serverUri,
       int maxRetries,
       long echoTimeoutMs,
-      BlockingQueue<MetricRecord> metricsQueue) {
+      BlockingQueue<MetricRecord> metricsQueue,
+      RoomMembershipTracker membershipTracker) {
     this.outbound = outbound;
     this.serverUri = serverUri;
     this.maxRetries = maxRetries;
     this.echoTimeoutMs = echoTimeoutMs;
     this.client = buildClient(serverUri);
     this.metricsQueue = metricsQueue;
+    this.membershipTracker = membershipTracker;
   }
 
 
@@ -213,6 +225,18 @@ public class ConnectionWorker implements Runnable {
           ChatMessage msg = outbound.take();
           if (msg.isPoison()) break;
 
+          if (!validateAndUpdateMembership(msg)) {
+            sentFailed.incrementAndGet();
+            metricsQueue.offer(new MetricRecord(
+                System.currentTimeMillis(),
+                msg.getMessageType(),
+                -1,
+                "INVALID_MEMBERSHIP",
+                Integer.parseInt(msg.getRoomId())
+            ));
+            continue;
+          }
+
           boolean ok = sendWaitEchoWithRetries(msg);
           if (ok) sentOk.incrementAndGet();
           else sentFailed.incrementAndGet();
@@ -222,6 +246,40 @@ public class ConnectionWorker implements Runnable {
     } finally {
       safeClose();
     }
+  }
+
+  /**
+   * Validates a message against the shared {@link RoomMembershipTracker} and updates
+   * the tracker state for JOIN and LEAVE messages.
+   *
+   * <ul>
+   *   <li>JOIN: records the user as a member of the room, then returns {@code true}.</li>
+   *   <li>TEXT: returns {@code true} only if the user is currently in the room.</li>
+   *   <li>LEAVE: returns {@code true} only if the user is currently in the room,
+   *       and removes the user from the room before returning.</li>
+   * </ul>
+   *
+   * @param msg the message to validate
+   * @return {@code true} if the message should be sent; {@code false} if it should be dropped
+   */
+  private boolean validateAndUpdateMembership(ChatMessage msg) {
+    String userId = msg.getUserId();
+    String roomId = msg.getRoomId();
+    MessageType type = msg.getMessageType();
+
+    if (type == MessageType.JOIN) {
+      membershipTracker.join(userId, roomId);
+      return true;
+    } else if (type == MessageType.TEXT) {
+      return membershipTracker.isMember(userId, roomId);
+    } else if (type == MessageType.LEAVE) {
+      if (membershipTracker.isMember(userId, roomId)) {
+        membershipTracker.leave(userId, roomId);
+        return true;
+      }
+      return false;
+    }
+    return true;
   }
 
   /**

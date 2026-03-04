@@ -5,6 +5,7 @@ import edu.northeastern.cs6650.client.metrics.MetricRecord;
 import edu.northeastern.cs6650.client.metrics.MetricsAnalyzer;
 import edu.northeastern.cs6650.client.model.ChatMessage;
 import edu.northeastern.cs6650.client.generator.MainPhaseMessageGenerator;
+import edu.northeastern.cs6650.client.util.RoomMembershipTracker;
 import edu.northeastern.cs6650.client.ws.ConnectionWorker;
 import java.net.URI;
 import java.nio.file.Path;
@@ -96,15 +97,18 @@ public class LoadTestRunner {
       return t;
     });
 
+    // Shared tracker — all workers validate and update membership concurrently
+    RoomMembershipTracker membershipTracker = new RoomMembershipTracker();
+
     System.out.println("\n=== Starting Load Test ===");
     System.out.println("workers=" + TOTAL_WORKERS
         + " messages=" + TOTAL_MESSAGES
         + " rooms=" + ROOMS);
 
-    // Create and submit all workers sharing the single queue
+    // Create and submit all workers sharing the single queue and membership tracker
     for (int i = 0; i < TOTAL_WORKERS; i++) {
       ConnectionWorker worker = new ConnectionWorker(
-          sharedQueue, serverUri, 5, 5000, metricsQueue);
+          sharedQueue, serverUri, 5, 5000, metricsQueue, membershipTracker);
       workers.add(worker);
       pool.submit(worker);
     }
