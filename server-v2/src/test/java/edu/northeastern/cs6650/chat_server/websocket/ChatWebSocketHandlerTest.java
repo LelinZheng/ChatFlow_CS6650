@@ -7,6 +7,7 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.MessageProperties;
 import edu.northeastern.cs6650.chat_server.config.ChannelPool;
 import edu.northeastern.cs6650.chat_server.config.RabbitMQConfig;
+import edu.northeastern.cs6650.chat_server.dedup.MessageDeduplicator;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.time.Instant;
@@ -24,10 +25,13 @@ class ChatWebSocketHandlerTest {
 
   private final ObjectMapper mapper = new ObjectMapper();
   private RoomManager mockRoomManager;
+  private MessageDeduplicator mockDeduplicator;
 
   @BeforeEach
   void setUp() {
     mockRoomManager = mock(RoomManager.class);
+    mockDeduplicator = mock(MessageDeduplicator.class);
+    when(mockDeduplicator.isDuplicate(any())).thenReturn(false); // allow by default
   }
 
   private ChannelPool mockChannelPool() throws Exception {
@@ -47,8 +51,13 @@ class ChatWebSocketHandlerTest {
   }
 
   private String payload(String messageType) {
+    return payload(messageType, java.util.UUID.randomUUID().toString());
+  }
+
+  private String payload(String messageType, String messageId) {
     return """
             {
+              "messageId": "%s",
               "userId": "123",
               "username": "user_123",
               "message": "hello",
@@ -56,14 +65,14 @@ class ChatWebSocketHandlerTest {
               "messageType": "%s",
               "roomId": "5"
             }
-            """.formatted(Instant.now().toString(), messageType);
+            """.formatted(messageId, Instant.now().toString(), messageType);
   }
 
   // ── connection lifecycle ───────────────────────────────────
 
   @Test
   void afterConnectionEstablished_doesNotAddSessionToRoom() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.afterConnectionEstablished(session);
@@ -73,7 +82,7 @@ class ChatWebSocketHandlerTest {
 
   @Test
   void afterConnectionClosed_removesSessionFromRoomManager() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.afterConnectionClosed(session, CloseStatus.NORMAL);
@@ -85,7 +94,7 @@ class ChatWebSocketHandlerTest {
 
   @Test
   void handleTextMessage_textMessage_movesConnectionToRoom() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage(payload("TEXT")));
@@ -95,7 +104,7 @@ class ChatWebSocketHandlerTest {
 
   @Test
   void handleTextMessage_joinMessage_movesConnectionToRoom() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage(payload("JOIN")));
@@ -105,7 +114,7 @@ class ChatWebSocketHandlerTest {
 
   @Test
   void handleTextMessage_leaveMessage_movesConnectionToRoom() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage(payload("LEAVE")));
@@ -121,7 +130,7 @@ class ChatWebSocketHandlerTest {
     ChannelPool mockPool = mock(ChannelPool.class);
     when(mockPool.borrowChannel()).thenReturn(mockChannel);
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage(payload("TEXT")));
@@ -141,7 +150,7 @@ class ChatWebSocketHandlerTest {
     ChannelPool mockPool = mock(ChannelPool.class);
     when(mockPool.borrowChannel()).thenReturn(mockChannel);
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage(payload("JOIN")));
@@ -160,7 +169,7 @@ class ChatWebSocketHandlerTest {
     ChannelPool mockPool = mock(ChannelPool.class);
     when(mockPool.borrowChannel()).thenReturn(mockChannel);
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage(payload("LEAVE")));
@@ -177,7 +186,7 @@ class ChatWebSocketHandlerTest {
 
   @Test
   void handleTextMessage_invalidJson_sendsInvalidJsonError() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage("{not valid json"));
@@ -189,11 +198,12 @@ class ChatWebSocketHandlerTest {
 
   @Test
   void handleTextMessage_validationFailed_sendsValidationFailedError() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     String badPayload = """
             {
+              "messageId": "msg-bad",
               "userId": "123",
               "username": "ab",
               "message": "hi",
@@ -213,6 +223,21 @@ class ChatWebSocketHandlerTest {
     verify(mockRoomManager, never()).addSession(any(), any());
   }
 
+  // ── idempotency ───────────────────────────────────────────
+
+  @Test
+  void handleTextMessage_duplicateMessageId_dropsMessage() throws Exception {
+    when(mockDeduplicator.isDuplicate(any())).thenReturn(true);
+
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager, mockDeduplicator);
+    WebSocketSession session = mockSession();
+
+    handler.handleTextMessage(session, new TextMessage(payload("TEXT", "dup-id")));
+
+    verify(mockRoomManager, never()).addSession(any(), any());
+    verify(session, never()).sendMessage(any());
+  }
+
   // ── publish failure ────────────────────────────────────────
 
   @Test
@@ -223,7 +248,7 @@ class ChatWebSocketHandlerTest {
     doThrow(new RuntimeException("publish failed"))
         .when(mockChannel).basicPublish(any(), any(), any(), any());
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     assertDoesNotThrow(() -> handler.handleTextMessage(session, new TextMessage(payload("TEXT"))));
@@ -238,7 +263,7 @@ class ChatWebSocketHandlerTest {
     doThrow(new RuntimeException("connection refused"))
         .when(mockChannel).basicPublish(any(), any(), any(), any());
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager, mockDeduplicator);
     WebSocketSession session = mockSession();
 
     handler.handleTextMessage(session, new TextMessage(payload("TEXT")));
@@ -257,7 +282,7 @@ class ChatWebSocketHandlerTest {
     doThrow(new RuntimeException("rabbitmq down"))
         .when(mockChannel).basicPublish(any(), any(), any(), any());
 
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager, mockDeduplicator);
 
     for (int i = 0; i < 5; i++) {
       handler.handleTextMessage(mockSession(), new TextMessage(payload("TEXT")));

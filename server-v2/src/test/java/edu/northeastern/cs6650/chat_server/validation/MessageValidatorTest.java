@@ -13,6 +13,7 @@ public class MessageValidatorTest {
 
   private ClientMessage validTextMessage() {
     ClientMessage msg = new ClientMessage();
+    msg.setMessageId("msg-" + java.util.UUID.randomUUID());
     msg.setUserId("123");
     msg.setUsername("user_name_1");
     msg.setMessage("hello");
@@ -20,6 +21,19 @@ public class MessageValidatorTest {
     msg.setTimestamp(Instant.now().toString());
     msg.setRoomId("5");  // required — server routes by roomId
     return msg;
+  }
+
+  @Test
+  void validate_messageIdNullOrBlank_addsMessageIdError() {
+    String expected = "messageId is required";
+
+    ClientMessage nullId = validTextMessage();
+    nullId.setMessageId(null);
+    assertTrue(MessageValidator.validate(nullId).contains(expected));
+
+    ClientMessage blankId = validTextMessage();
+    blankId.setMessageId("  ");
+    assertTrue(MessageValidator.validate(blankId).contains(expected));
   }
 
   @Test

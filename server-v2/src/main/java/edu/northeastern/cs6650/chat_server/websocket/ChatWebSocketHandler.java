@@ -4,6 +4,7 @@ import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.MessageProperties;
 import edu.northeastern.cs6650.chat_server.circuitbreaker.CircuitBreaker;
 import edu.northeastern.cs6650.chat_server.config.ChannelPool;
+import edu.northeastern.cs6650.chat_server.dedup.MessageDeduplicator;
 import edu.northeastern.cs6650.chat_server.config.RabbitMQConfig;
 import edu.northeastern.cs6650.chat_server.model.ClientMessage;
 import edu.northeastern.cs6650.chat_server.model.ErrorResponse;
@@ -47,6 +48,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
   private final RoomManager roomManager;
 
+  private final MessageDeduplicator deduplicator;
+
   private static final Logger log = LoggerFactory.getLogger(ChatWebSocketHandler.class);
 
   private final CircuitBreaker circuitBreaker = new CircuitBreaker(
@@ -54,15 +57,17 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
   /**
    * Constructor for ChatWebSocketHandler.
-   * @param objectMapper the ObjectMapper for JSON processing
-   * @param channelPool  pool of RabbitMQ channels for publishing messages
-   * @param roomManager  manages WebSocket sessions for broadcasting messages
+   * @param objectMapper  the ObjectMapper for JSON processing
+   * @param channelPool   pool of RabbitMQ channels for publishing messages
+   * @param roomManager   manages WebSocket sessions for broadcasting messages
+   * @param deduplicator  drops messages whose messageId has already been processed
    */
   public ChatWebSocketHandler(ObjectMapper objectMapper, ChannelPool channelPool,
-      RoomManager roomManager) {
+      RoomManager roomManager, MessageDeduplicator deduplicator) {
     this.channelPool = channelPool;
     this.objectMapper = objectMapper;
     this.roomManager = roomManager;
+    this.deduplicator = deduplicator;
   }
 
   /**
@@ -112,6 +117,12 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
           "Message validation failed",
           errors);
       session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse)));
+      return;
+    }
+
+    // Drop duplicate messages (idempotency)
+    if (deduplicator.isDuplicate(clientMessage.getMessageId())) {
+      log.debug("Duplicate messageId {} — dropping", clientMessage.getMessageId());
       return;
     }
 
