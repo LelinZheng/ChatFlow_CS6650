@@ -127,11 +127,10 @@ public class LoadTestRunner {
 
     for (int i = 0; i < warmupWorkers; i++) {
       int roomId = (i % rooms) + 1;
-      URI fullUri = baseUri.resolve(String.valueOf(roomId));
 
       ConnectionWorker worker = new ConnectionWorker(
           workerQueues[workerIndex],
-          fullUri,
+          baseUri,
           5, 5000,
           metricsQueue
       );
@@ -149,6 +148,8 @@ public class LoadTestRunner {
         for (int i = 0; i < warmupTotalMessages; i++) {
           ChatMessage msg = factory.createMessage();
           int targetWorker = i % warmupWorkers;
+          int roomId = (targetWorker % rooms) + 1;
+          msg.setRoomId(String.valueOf(roomId));
           workerQueues[targetWorker].put(msg);
         }
       } catch (InterruptedException e) {
@@ -210,11 +211,9 @@ public class LoadTestRunner {
           continue;
         }
 
-        URI fullUri = baseUri.resolve(String.valueOf(roomId));
-
         ConnectionWorker worker = new ConnectionWorker(
             workerQueues[workerIndex],
-            fullUri,
+            baseUri,
             5, 5000,
             metricsQueue
         );
