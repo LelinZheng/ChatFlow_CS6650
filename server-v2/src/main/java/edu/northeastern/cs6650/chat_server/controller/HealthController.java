@@ -16,7 +16,7 @@ public class HealthController {
 
   /**
    * Health check endpoint.
-   * @return a map containing the health status and current timestamp and the server name 
+   * @return a map containing the health status and current timestamp and the server name
    */
   @GetMapping("/health")
   public Map<String, Object> health() {
