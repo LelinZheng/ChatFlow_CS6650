@@ -4,96 +4,68 @@ import edu.northeastern.cs6650.client.model.ChatMessage;
 import edu.northeastern.cs6650.client.util.MessageFactory;
 import edu.northeastern.cs6650.client.util.RandomGenerator;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * Generates chat messages for the main load testing phase.
+ * Generates chat messages for the load test and places them on a shared queue.
  *
- * <p>This generator runs in a single dedicated thread and produces a fixed
- * total number of messages. Each message is assigned a random room ID and
- * routed to one of the persistent connection workers for that room using
- * round-robin load balancing.</p>
+ * <p>This generator runs in a single dedicated thread and produces a fixed total
+ * number of messages. Each message is assigned a uniformly random room ID so that
+ * load is spread evenly across all rooms. Messages are placed on the shared
+ * {@link BlockingQueue} that all {@code ConnectionWorker} threads compete to drain,
+ * which naturally balances work across workers without any explicit room-to-worker
+ * pinning.</p>
  *
- * <p>Messages are placed into per-worker blocking queues to ensure that
- * sender threads never wait for message generation while maintaining
- * bounded memory usage.</p>
+ * <p>After all messages have been enqueued, one poison-pill message per worker is
+ * appended so that every worker exits cleanly when the queue is exhausted.</p>
  */
 public class MainPhaseMessageGenerator implements Runnable {
-  private final BlockingQueue<ChatMessage>[] workerQueues; // # of workers = rooms * connsPerRoom
-  private final int rooms;
-  private final int connsPerRoom;
-  private final int messageCount;
-  private final MessageFactory producer;
-  private final RandomGenerator randomGenerator;
 
-  // per-room round robin counter
-  private final AtomicInteger[] roundRobinCounters;
+  private final BlockingQueue<ChatMessage> queue;
+  private final int rooms;
+  private final int messageCount;
+  private final int workerCount;
+  private final MessageFactory factory;
+  private final RandomGenerator randomGenerator;
 
   /**
    * Constructs a MainPhaseMessageGenerator.
-   * @param workerQueues the per-worker blocking queues
-   * @param rooms the number of chat rooms
-   * @param connsPerRoom the number of connections per room
+   *
+   * @param queue        the shared queue that all workers pull from
+   * @param rooms        the number of chat rooms (messages are distributed uniformly across them)
    * @param messageCount the total number of messages to generate
+   * @param workerCount  the number of worker threads; one poison pill is enqueued per worker
    */
-  public MainPhaseMessageGenerator(BlockingQueue<ChatMessage>[] workerQueues,
+  public MainPhaseMessageGenerator(BlockingQueue<ChatMessage> queue,
       int rooms,
-      int connsPerRoom,
-      int messageCount) {
-    this.workerQueues = workerQueues;
+      int messageCount,
+      int workerCount) {
+    this.queue = queue;
     this.rooms = rooms;
-    this.connsPerRoom = connsPerRoom;
     this.messageCount = messageCount;
-    this.producer = new MessageFactory();
+    this.workerCount = workerCount;
+    this.factory = new MessageFactory();
     this.randomGenerator = new RandomGenerator();
-
-    this.roundRobinCounters = new AtomicInteger[rooms + 1];
-    for (int r = 1; r <= rooms; r++) roundRobinCounters[r] = new AtomicInteger(0);
   }
 
   /**
-   * Generates and routes messages to worker queues.
-   * Each message is assigned a random room ID and routed to a worker
-   * using round-robin within that room. After all messages are generated,
-   * poison pills are sent to each worker to signal completion.
+   * Generates {@code messageCount} messages with random room IDs and places them on the shared
+   * queue, then enqueues one poison pill per worker to signal termination.
    */
   @Override
   public void run() {
     try {
       for (int i = 0; i < messageCount; i++) {
-        ChatMessage msg = producer.createMessage();
-
-        int roomId = pickRoomId();
+        ChatMessage msg = factory.createMessage();
+        int roomId = randomGenerator.generateRandomInteger(1, rooms);
         msg.setRoomId(String.valueOf(roomId));
-
-        int offset = roundRobinCounters[roomId].getAndIncrement() % connsPerRoom;
-        int workerIndex = (roomId - 1) * connsPerRoom + offset;
-
-        workerQueues[workerIndex].put(msg); // blocks if that worker queue is full
+        queue.put(msg);
+      }
+      // Signal each worker to stop
+      for (int i = 0; i < workerCount; i++) {
+        queue.put(ChatMessage.poison());
       }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
-    // Send poison pills to all workers to signal completion
-    for (int w = 0; w < workerQueues.length; w++) {
-      try {
-        workerQueues[w].put(ChatMessage.poison());
-      } catch (InterruptedException e) {
-        throw new RuntimeException(e);
-      }
-    }
   }
-
-  /**
-   * Selects a random room ID for message routing.
-   *
-   * <p>Room IDs are distributed uniformly across the configured number of rooms
-   * to ensure balanced load distribution across all chat rooms during the test.</p>
-   *
-   * @return a random room ID between 1 and the configured number of rooms (inclusive)
-   */
-  private int pickRoomId() {
-    return randomGenerator.generateRandomInteger(1, rooms);
-  }
-
 }
