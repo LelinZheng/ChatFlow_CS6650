@@ -26,6 +26,7 @@ public class MessageValidator {
    * <p>
    * Rules:
    * <ul>
+   *   <li>messageId: non-null, non-blank (used for server-side idempotency)</li>
    *   <li>userId: numeric, 1–100000</li>
    *   <li>username: 3–20 alphanumeric characters (underscores allowed)</li>
    *   <li>message: 1–500 characters (only validated for TEXT type)</li>
@@ -39,6 +40,10 @@ public class MessageValidator {
    */
   public static List<String> validate(ClientMessage msg) {
     List<String> errors = new ArrayList<>();
+
+    if (msg.getMessageId() == null || msg.getMessageId().isBlank()) {
+      errors.add("messageId is required");
+    }
 
     try {
       int userId = Integer.parseInt(msg.getUserId());

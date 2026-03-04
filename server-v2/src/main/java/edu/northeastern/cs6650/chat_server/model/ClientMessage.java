@@ -11,6 +11,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
  */
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ClientMessage {
+  private String messageId;
   private String userId;
   private String username;
   private String message;
@@ -20,6 +21,22 @@ public class ClientMessage {
 
   /** Default no-arg constructor required by Jackson for deserialization. */
   public ClientMessage() { }
+
+  /**
+   * Get the client-assigned message ID used for idempotency deduplication.
+   * @return messageId string
+   */
+  public String getMessageId() {
+    return messageId;
+  }
+
+  /**
+   * Set the client-assigned message ID.
+   * @param messageId the message ID to set
+   */
+  public void setMessageId(String messageId) {
+    this.messageId = messageId;
+  }
 
   /**
    * Get the user ID of the message sender.
