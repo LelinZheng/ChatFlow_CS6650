@@ -2,7 +2,7 @@ package edu.northeastern.cs6650.consumer.consumer;
 
 import com.rabbitmq.client.Channel;
 import edu.northeastern.cs6650.consumer.config.RabbitMQConfig;
-import edu.northeastern.cs6650.consumer.config.ServerRegistry;
+import edu.northeastern.cs6650.consumer.redis.RedisPublisher;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.util.ArrayList;
@@ -35,9 +35,8 @@ import org.springframework.stereotype.Component;
  * assignments as competing consumers — RabbitMQ delivers each message to
  * whichever thread is free first.
  * <p>
- * In Design B, each {@link RoomConsumer} calls {@link ServerRegistry} to fan out
- * messages to all server instances via their internal broadcast endpoints,
- * rather than maintaining WebSocket sessions directly.
+ * Each {@link RoomConsumer} publishes messages to Redis Pub/Sub via {@link RedisPublisher},
+ * which fans out to all subscribed WebSocket server instances simultaneously.
  */
 @Component
 @DependsOn("rabbitMQConfig")
@@ -46,18 +45,18 @@ public class ConsumerThreadPool {
   private static final Logger log = LoggerFactory.getLogger(ConsumerThreadPool.class);
 
   private final RabbitMQConfig config;
-  private final ServerRegistry serverRegistry;
+  private final RedisPublisher redisPublisher;
   private ExecutorService executor;
 
   /**
    * Constructs the pool with its required dependencies.
    *
-   * @param config         RabbitMQ config providing connection and tuning params
-   * @param serverRegistry registry of chat server instances to fan out broadcasts to
+   * @param config          RabbitMQ config providing connection and tuning params
+   * @param redisPublisher  publishes messages to Redis Pub/Sub for server fanout
    */
-  public ConsumerThreadPool(RabbitMQConfig config, ServerRegistry serverRegistry) {
+  public ConsumerThreadPool(RabbitMQConfig config, RedisPublisher redisPublisher) {
     this.config = config;
-    this.serverRegistry = serverRegistry;
+    this.redisPublisher = redisPublisher;
   }
 
   /**
@@ -100,7 +99,7 @@ public class ConsumerThreadPool {
       Channel channel = config.getConnection().createChannel();
       channel.basicQos(config.getPrefetchCount());
 
-      RoomConsumer consumer = new RoomConsumer(channel, assignedQueues, serverRegistry);
+      RoomConsumer consumer = new RoomConsumer(channel, assignedQueues, redisPublisher);
       executor.submit(consumer);
 
       log.info("Thread {} assigned queues: {}", i, assignedQueues);
