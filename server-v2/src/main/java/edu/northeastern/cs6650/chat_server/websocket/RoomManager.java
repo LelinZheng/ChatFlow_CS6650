@@ -1,6 +1,5 @@
 package edu.northeastern.cs6650.chat_server.websocket;
 
-import edu.northeastern.cs6650.chat_server.controller.InternalBroadcastController;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -19,8 +18,9 @@ import org.springframework.web.socket.WebSocketSession;
  *   <li>{@code roomSessions}: roomId → all active sessions in that room (for broadcasting)</li>
  *   <li>{@code sessionRoomMap}: sessionId → roomId (for fast cleanup on disconnect)</li>
  * </ul>
- * Called by {@link ChatWebSocketHandler} on connect/disconnect,
- * and by {@link InternalBroadcastController} to broadcast messages from the consumer.
+ * Called by {@link ChatWebSocketHandler} on each message and disconnect,
+ * and by {@link edu.northeastern.cs6650.chat_server.redis.RedisSubscriber} to broadcast
+ * messages received from the consumer via Redis Pub/Sub.
  */
 @Component
 public class RoomManager {
@@ -82,8 +82,8 @@ public class RoomManager {
   /**
    * Broadcasts a message to all active sessions in a room.
    * Dead sessions are removed silently during broadcast.
-   * Called by {@link InternalBroadcastController} when the consumer
-   * delivers a message for this room.
+   * Called by {@link edu.northeastern.cs6650.chat_server.redis.RedisSubscriber} when
+   * the consumer delivers a message for this room via Redis Pub/Sub.
    *
    * @param roomId  the room to broadcast to
    * @param payload the JSON string to send to all sessions
