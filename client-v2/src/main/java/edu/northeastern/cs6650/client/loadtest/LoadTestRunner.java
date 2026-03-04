@@ -4,7 +4,7 @@ import edu.northeastern.cs6650.client.metrics.CsvMetricsWriter;
 import edu.northeastern.cs6650.client.metrics.MetricRecord;
 import edu.northeastern.cs6650.client.metrics.MetricsAnalyzer;
 import edu.northeastern.cs6650.client.model.ChatMessage;
-import edu.northeastern.cs6650.client.generator.MainPhaseMessageGenerator;
+import edu.northeastern.cs6650.client.generator.MessageGenerator;
 import edu.northeastern.cs6650.client.util.RoomMembershipTracker;
 import edu.northeastern.cs6650.client.ws.ConnectionWorker;
 import java.net.URI;
@@ -117,7 +117,7 @@ public class LoadTestRunner {
 
     // Generator produces TOTAL_MESSAGES messages then one poison pill per worker
     Thread generator = new Thread(
-        new MainPhaseMessageGenerator(sharedQueue, ROOMS, TOTAL_MESSAGES, TOTAL_WORKERS),
+        new MessageGenerator(sharedQueue, ROOMS, TOTAL_MESSAGES, TOTAL_WORKERS),
         "message-generator");
     generator.start();
 
