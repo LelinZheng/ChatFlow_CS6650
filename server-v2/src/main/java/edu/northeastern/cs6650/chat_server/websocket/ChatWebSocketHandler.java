@@ -26,9 +26,17 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * WebSocket handler that processes incoming chat messages.
  * <p>
- * Validates each message, wraps it in a {@link QueueMessage}, and publishes it
- * to the RabbitMQ topic exchange for the appropriate room. The actual broadcasting
- * to connected clients is handled by the consumer application.
+ * Clients connect to {@code /chat}. Room membership is not fixed at connect time —
+ * every incoming message carries a {@code roomId}, and the connection is moved to
+ * that room on each message. This supports load-test clients where many users share
+ * a pool of connections and each message may target a different room.
+ * <p>
+ * All message types (JOIN, LEAVE, TEXT) follow the same path:
+ * <ol>
+ *   <li>Parse and validate the message</li>
+ *   <li>Move the connection to the room from the message ({@link RoomManager#addSession})</li>
+ *   <li>Publish to RabbitMQ so the consumer broadcasts it to all connections in that room</li>
+ * </ol>
  */
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
@@ -58,54 +66,22 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   }
 
   /**
-   * Registers the client's WebSocket session in the appropriate room.
-   * <p>
-   * Extracts the roomId from the session URI path (e.g. {@code /chat/5} → {@code "5"})
-   * and delegates to {@link RoomManager#addSession} to track the session.
-   * If the roomId cannot be extracted, the session is closed immediately.
+   * Accepts the WebSocket connection. The session is not assigned to any room
+   * until a {@code JOIN} message is received.
    *
    * @param session the newly established WebSocket session
    */
   public void afterConnectionEstablished(WebSocketSession session) {
-    String roomId = extractRoomId(session);
-    if (roomId == null) {
-      log.warn("Could not extract roomId from session {}, closing", session.getId());
-      try { session.close(); } catch (Exception ignored) {}
-      return;
-    }
-    roomManager.addSession(roomId, session);
-  }
-
-  /**
-   * Extracts the roomId from the WebSocket session URI.
-   *
-   * @param session the WebSocket session to extract from
-   * @return the roomId string, or null if it cannot be extracted
-   */
-  private String extractRoomId(WebSocketSession session) {
-    try {
-      String path = session.getUri().getPath(); // e.g. /chat/5
-      return path.substring(path.lastIndexOf('/') + 1);
-    } catch (Exception e) {
-      return null;
-    }
+    log.info("WebSocket connection established: {}", session.getId());
   }
 
   /**
    * Processes an incoming WebSocket text message.
    * <p>
-   * Steps:
-   * <ol>
-   *   <li>Deserialize JSON payload into {@link ClientMessage}</li>
-   *   <li>Validate fields via {@link MessageValidator}</li>
-   *   <li>Check the circuit breaker — if OPEN or HALF_OPEN (non-probe thread),
-   *       reject immediately with {@code SERVICE_UNAVAILABLE}</li>
-   *   <li>Publish a {@link QueueMessage} to RabbitMQ on routing key {@code room.{roomId}}</li>
-   * </ol>
-   * Validation or JSON errors are sent back to the client as {@link ErrorResponse}.
-   * Publish failures are reported as {@code PUBLISH_FAILED} and recorded in the circuit breaker.
-   * After 5 consecutive failures the circuit opens; after 30 seconds one probe is allowed
-   * through — if it succeeds the circuit closes and normal operation resumes automatically.
+   * All message types (JOIN, LEAVE, TEXT) go through the same path:
+   * the connection is moved to the room from the message, then the message
+   * is published to RabbitMQ so every connection in that room receives it.
+   * JOIN and LEAVE carry text (e.g. "user joined") that is broadcast just like TEXT.
    *
    * @param session the sender's WebSocket session
    * @param message the raw text frame received
@@ -139,6 +115,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
       return;
     }
 
+    // Move this connection to the room specified in the message (all message types)
+    roomManager.addSession(clientMessage.getRoomId(), session);
+
     // Check circuit breaker before attempting to publish
     if (!circuitBreaker.allowRequest()) {
       log.warn("Circuit breaker open — dropping message for room {}", clientMessage.getRoomId());
@@ -150,7 +129,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
       return;
     }
 
-    // Build queue message
+    // Build queue message and publish for all types (JOIN/LEAVE carry broadcast text too)
     QueueMessage queueMsg = new QueueMessage(
         UUID.randomUUID().toString(),
         clientMessage.getRoomId(),
@@ -166,7 +145,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     String json = objectMapper.writeValueAsString(queueMsg);
     String routingKey = "room." + clientMessage.getRoomId();
 
-    // Publish to RabbitMQ
     Channel channel = null;
     try {
       channel = channelPool.borrowChannel();
@@ -176,7 +154,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
           MessageProperties.PERSISTENT_TEXT_PLAIN,
           json.getBytes(StandardCharsets.UTF_8)
       );
-      circuitBreaker.recordSuccess(); // reset failure count on success
+      circuitBreaker.recordSuccess();
 
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
@@ -186,14 +164,12 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
       circuitBreaker.recordFailure();
       log.error("Failed to publish message to room {}: {}", clientMessage.getRoomId(),
           e.getMessage());
-      // Notify client that their message was not delivered
       ErrorResponse publishErr = new ErrorResponse(
           "PUBLISH_FAILED",
           "Failed to deliver message, please try again",
           List.of(e.getMessage()));
       session.sendMessage(new TextMessage(objectMapper.writeValueAsString(publishErr)));
     } finally {
-      // Always return channel to pool regardless of success or failure
       channelPool.returnChannel(channel);
     }
   }
@@ -209,7 +185,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   @Override
   public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
     roomManager.removeSession(session);
-    System.out.println("WebSocket connection closed: " + session.getId());
+    log.info("WebSocket connection closed: {}", session.getId());
   }
 
 }

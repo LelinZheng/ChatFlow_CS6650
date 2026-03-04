@@ -60,6 +60,28 @@ class RoomManagerTest {
     assertEquals(2, roomManager.getActiveRoomCount());
   }
 
+  @Test
+  void addSession_sessionAlreadyInDifferentRoom_autoLeavesOldRoom() {
+    WebSocketSession session = openSession();
+    roomManager.addSession("room1", session);
+    roomManager.addSession("room2", session);
+
+    assertEquals(1, roomManager.getTotalSessionCount()); // still one session total
+    assertEquals(1, roomManager.getActiveRoomCount());   // only room2 is active now
+    roomManager.broadcastToRoom("room1", "should not receive");
+    assertDoesNotThrow(() -> roomManager.broadcastToRoom("room1", "msg"));
+  }
+
+  @Test
+  void addSession_sessionRejoinsSameRoom_noChange() {
+    WebSocketSession session = openSession();
+    roomManager.addSession("room1", session);
+    roomManager.addSession("room1", session); // rejoin same room
+
+    assertEquals(1, roomManager.getTotalSessionCount());
+    assertEquals(1, roomManager.getActiveRoomCount());
+  }
+
   // ── removeSession ──────────────────────────────────────────
 
   @Test
