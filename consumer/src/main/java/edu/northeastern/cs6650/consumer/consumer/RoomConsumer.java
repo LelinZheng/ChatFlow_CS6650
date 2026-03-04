@@ -3,7 +3,7 @@ package edu.northeastern.cs6650.consumer.consumer;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Delivery;
 import edu.northeastern.cs6650.consumer.model.ChatMessage;
-import edu.northeastern.cs6650.consumer.config.ServerRegistry;
+import edu.northeastern.cs6650.consumer.redis.RedisPublisher;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
@@ -19,9 +19,9 @@ import tools.jackson.databind.ObjectMapper;
  * push-based delivery callbacks via {@code basicConsume} for each assigned queue,
  * then enters a sleep loop to stay alive while RabbitMQ fires callbacks asynchronously.
  * <p>
- * In Design B, broadcasting is done by calling {@link ServerRegistry#broadcastToAll},
- * which posts the message to every server instance's {@code /internal/broadcast} endpoint.
- * Each server then delivers the message to its locally connected WebSocket sessions.
+ * Broadcasting is done via Redis Pub/Sub: the message is published to channel
+ * {@code chat:room:{roomId}} and all subscribed WebSocket server instances deliver
+ * it to their locally connected sessions.
  * <p>
  * Delivery guarantees:
  * <ul>
@@ -39,7 +39,7 @@ public class RoomConsumer implements Runnable {
 
   private final Channel channel;
   private final List<String> assignedQueues;
-  private final ServerRegistry serverRegistry;
+  private final RedisPublisher redisPublisher;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   // duplicate detection: messageId -> time delivered
@@ -48,15 +48,15 @@ public class RoomConsumer implements Runnable {
   /**
    * Constructs a consumer for the given set of queues.
    *
-   * @param channel        dedicated RabbitMQ channel for this thread
-   * @param assignedQueues list of queue names this consumer subscribes to (e.g. "room.1")
-   * @param serverRegistry registry used to fan out messages to all server instances
+   * @param channel         dedicated RabbitMQ channel for this thread
+   * @param assignedQueues  list of queue names this consumer subscribes to (e.g. "room.1")
+   * @param redisPublisher  publishes messages to Redis Pub/Sub for server fanout
    */
   public RoomConsumer(Channel channel, List<String> assignedQueues,
-      ServerRegistry serverRegistry) {
+      RedisPublisher redisPublisher) {
     this.channel = channel;
     this.assignedQueues = assignedQueues;
-    this.serverRegistry = serverRegistry;
+    this.redisPublisher = redisPublisher;
   }
 
   /**
@@ -119,7 +119,7 @@ public class RoomConsumer implements Runnable {
   }
 
   /**
-   * Fans out a message to all server instances via {@link ServerRegistry#broadcastToAll},
+   * Publishes a message to the Redis channel for {@code roomId} via {@link RedisPublisher},
    * retrying up to {@link #MAX_RETRIES} times with exponential backoff on failure.
    * Acknowledges to RabbitMQ on success, nacks without requeue after all retries exhausted.
    *
@@ -131,7 +131,7 @@ public class RoomConsumer implements Runnable {
     int attempt = 0;
     while (attempt < MAX_RETRIES) {
       try {
-        serverRegistry.broadcastToAll(roomId, payload);
+        redisPublisher.publish(roomId, payload);
         ack(deliveryTag);
         return;
       } catch (Exception e) {

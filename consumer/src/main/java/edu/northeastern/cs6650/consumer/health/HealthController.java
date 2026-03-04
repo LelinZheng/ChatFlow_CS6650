@@ -1,6 +1,5 @@
 package edu.northeastern.cs6650.consumer.health;
 
-import edu.northeastern.cs6650.consumer.config.ServerRegistry;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -24,12 +23,6 @@ public class HealthController {
 
   private static final Logger log = LoggerFactory.getLogger(HealthController.class);
 
-  private final ServerRegistry serverRegistry;
-
-  public HealthController(ServerRegistry serverRegistry) {
-    this.serverRegistry = serverRegistry;
-  }
-
   /**
    * Basic health check — ALB calls this every 30 seconds.
    * Returns 200 OK as long as the consumer is running.
@@ -44,16 +37,12 @@ public class HealthController {
 
   /**
    * Detailed stats — called by monitoring scripts during load tests.
-   * Reports registered server instances so you can verify all servers
-   * are known to the consumer at test time.
    */
   @GetMapping("/stats")
   public ResponseEntity<Map<String, Object>> stats() {
     Map<String, Object> response = new LinkedHashMap<>();
     response.put("status", "UP");
     response.put("timestamp", Instant.now().toString());
-    response.put("serverInstances", serverRegistry.getServerInstances());
-    response.put("serverCount", serverRegistry.getServerInstances().size());
     return ResponseEntity.ok(response);
   }
 }

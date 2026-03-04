@@ -8,7 +8,7 @@ import static org.mockito.Mockito.when;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import edu.northeastern.cs6650.consumer.config.RabbitMQConfig;
-import edu.northeastern.cs6650.consumer.config.ServerRegistry;
+import edu.northeastern.cs6650.consumer.redis.RedisPublisher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -16,13 +16,13 @@ import org.junit.jupiter.api.Test;
 class ConsumerThreadPoolTest {
 
   private RabbitMQConfig mockConfig;
-  private ServerRegistry mockServerRegistry;
+  private RedisPublisher mockRedisPublisher;
   private Connection mockConnection;
 
   @BeforeEach
   void setUp() throws Exception {
     mockConfig = mock(RabbitMQConfig.class);
-    mockServerRegistry = mock(ServerRegistry.class);
+    mockRedisPublisher = mock(RedisPublisher.class);
     mockConnection = mock(Connection.class);
 
     when(mockConfig.getConnection()).thenReturn(mockConnection);
@@ -36,7 +36,7 @@ class ConsumerThreadPoolTest {
   void init_4threads_distributesWith5RoomsEach() throws Exception {
     when(mockConfig.getConsumerThreadCount()).thenReturn(4);
 
-    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockServerRegistry);
+    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher);
     pool.init();
 
     verify(mockConnection, times(4)).createChannel();
@@ -47,7 +47,7 @@ class ConsumerThreadPoolTest {
   void init_20threads_oneRoomPerThread() throws Exception {
     when(mockConfig.getConsumerThreadCount()).thenReturn(20);
 
-    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockServerRegistry);
+    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher);
     pool.init();
 
     verify(mockConnection, times(20)).createChannel();
@@ -58,7 +58,7 @@ class ConsumerThreadPoolTest {
   void init_40threads_20roomsEachHave2CompetingConsumers() throws Exception {
     when(mockConfig.getConsumerThreadCount()).thenReturn(40);
 
-    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockServerRegistry);
+    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher);
     pool.init();
 
     verify(mockConnection, times(40)).createChannel();
@@ -69,7 +69,7 @@ class ConsumerThreadPoolTest {
   void init_1thread_allRoomsAssignedToSingleThread() throws Exception {
     when(mockConfig.getConsumerThreadCount()).thenReturn(1);
 
-    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockServerRegistry);
+    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher);
     pool.init();
 
     verify(mockConnection, times(1)).createChannel();
