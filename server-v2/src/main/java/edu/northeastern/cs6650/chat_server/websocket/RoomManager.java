@@ -43,6 +43,16 @@ public class RoomManager {
    * @param session the client's WebSocket session
    */
   public void addSession(String roomId, WebSocketSession session) {
+    // If the session is already in a different room, remove it first
+    String currentRoom = sessionRoomMap.get(session.getId());
+    if (currentRoom != null && !currentRoom.equals(roomId)) {
+      Set<WebSocketSession> currentSessions = roomSessions.get(currentRoom);
+      if (currentSessions != null) {
+        currentSessions.remove(session);
+        log.info("Session {} auto-left room {} to join room {}", session.getId(), currentRoom, roomId);
+      }
+    }
+
     roomSessions
         .computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet())
         .add(session);

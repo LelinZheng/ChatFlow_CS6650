@@ -5,7 +5,6 @@ import static org.mockito.Mockito.*;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.MessageProperties;
-import edu.northeastern.cs6650.chat_server.circuitbreaker.CircuitBreaker;
 import edu.northeastern.cs6650.chat_server.config.ChannelPool;
 import edu.northeastern.cs6650.chat_server.config.RabbitMQConfig;
 import java.net.InetSocketAddress;
@@ -41,46 +40,34 @@ class ChatWebSocketHandlerTest {
   private WebSocketSession mockSession() throws Exception {
     WebSocketSession session = mock(WebSocketSession.class);
     when(session.getId()).thenReturn(UUID.randomUUID().toString());
-    when(session.getUri()).thenReturn(new URI("ws://localhost:8080/chat/5"));
+    when(session.getUri()).thenReturn(new URI("ws://localhost:8080/chat"));
     when(session.getLocalAddress()).thenReturn(new InetSocketAddress("localhost", 8080));
     when(session.getRemoteAddress()).thenReturn(new InetSocketAddress("127.0.0.1", 54321));
     return session;
   }
 
-  private String validPayload() {
+  private String payload(String messageType) {
     return """
             {
               "userId": "123",
               "username": "user_123",
               "message": "hello",
               "timestamp": "%s",
-              "messageType": "TEXT",
+              "messageType": "%s",
               "roomId": "5"
             }
-            """.formatted(Instant.now().toString());
+            """.formatted(Instant.now().toString(), messageType);
   }
 
   // ── connection lifecycle ───────────────────────────────────
 
   @Test
-  void afterConnectionEstablished_validRoom_addsSessionToRoomManager() throws Exception {
+  void afterConnectionEstablished_doesNotAddSessionToRoom() throws Exception {
     ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
     WebSocketSession session = mockSession();
 
     handler.afterConnectionEstablished(session);
 
-    verify(mockRoomManager).addSession("5", session);
-  }
-
-  @Test
-  void afterConnectionEstablished_invalidUri_closesSession() throws Exception {
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
-    WebSocketSession session = mock(WebSocketSession.class);
-    when(session.getUri()).thenReturn(null); // simulate bad URI
-
-    handler.afterConnectionEstablished(session);
-
-    verify(session).close();
     verify(mockRoomManager, never()).addSession(any(), any());
   }
 
@@ -94,6 +81,98 @@ class ChatWebSocketHandlerTest {
     verify(mockRoomManager).removeSession(session);
   }
 
+  // ── room mapping on every message type ────────────────────
+
+  @Test
+  void handleTextMessage_textMessage_movesConnectionToRoom() throws Exception {
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    WebSocketSession session = mockSession();
+
+    handler.handleTextMessage(session, new TextMessage(payload("TEXT")));
+
+    verify(mockRoomManager).addSession("5", session);
+  }
+
+  @Test
+  void handleTextMessage_joinMessage_movesConnectionToRoom() throws Exception {
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    WebSocketSession session = mockSession();
+
+    handler.handleTextMessage(session, new TextMessage(payload("JOIN")));
+
+    verify(mockRoomManager).addSession("5", session);
+  }
+
+  @Test
+  void handleTextMessage_leaveMessage_movesConnectionToRoom() throws Exception {
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
+    WebSocketSession session = mockSession();
+
+    handler.handleTextMessage(session, new TextMessage(payload("LEAVE")));
+
+    verify(mockRoomManager).addSession("5", session);
+  }
+
+  // ── all message types publish to RabbitMQ ─────────────────
+
+  @Test
+  void handleTextMessage_textMessage_publishesToRabbitMQ() throws Exception {
+    Channel mockChannel = mock(Channel.class);
+    ChannelPool mockPool = mock(ChannelPool.class);
+    when(mockPool.borrowChannel()).thenReturn(mockChannel);
+
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
+    WebSocketSession session = mockSession();
+
+    handler.handleTextMessage(session, new TextMessage(payload("TEXT")));
+
+    verify(mockChannel).basicPublish(
+        eq(RabbitMQConfig.EXCHANGE_NAME),
+        eq("room.5"),
+        eq(MessageProperties.PERSISTENT_TEXT_PLAIN),
+        any(byte[].class)
+    );
+    verify(mockPool).returnChannel(mockChannel);
+  }
+
+  @Test
+  void handleTextMessage_joinMessage_publishesToRabbitMQ() throws Exception {
+    Channel mockChannel = mock(Channel.class);
+    ChannelPool mockPool = mock(ChannelPool.class);
+    when(mockPool.borrowChannel()).thenReturn(mockChannel);
+
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
+    WebSocketSession session = mockSession();
+
+    handler.handleTextMessage(session, new TextMessage(payload("JOIN")));
+
+    verify(mockChannel).basicPublish(
+        eq(RabbitMQConfig.EXCHANGE_NAME),
+        eq("room.5"),
+        eq(MessageProperties.PERSISTENT_TEXT_PLAIN),
+        any(byte[].class)
+    );
+  }
+
+  @Test
+  void handleTextMessage_leaveMessage_publishesToRabbitMQ() throws Exception {
+    Channel mockChannel = mock(Channel.class);
+    ChannelPool mockPool = mock(ChannelPool.class);
+    when(mockPool.borrowChannel()).thenReturn(mockChannel);
+
+    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
+    WebSocketSession session = mockSession();
+
+    handler.handleTextMessage(session, new TextMessage(payload("LEAVE")));
+
+    verify(mockChannel).basicPublish(
+        eq(RabbitMQConfig.EXCHANGE_NAME),
+        eq("room.5"),
+        eq(MessageProperties.PERSISTENT_TEXT_PLAIN),
+        any(byte[].class)
+    );
+  }
+
   // ── JSON / validation errors ───────────────────────────────
 
   @Test
@@ -105,6 +184,7 @@ class ChatWebSocketHandlerTest {
 
     JsonNode root = mapper.readTree(captureOneSentMessage(session).getPayload());
     assertEquals("INVALID_JSON", root.get("errorCode").asText());
+    verify(mockRoomManager, never()).addSession(any(), any());
   }
 
   @Test
@@ -112,7 +192,7 @@ class ChatWebSocketHandlerTest {
     ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockChannelPool(), mockRoomManager);
     WebSocketSession session = mockSession();
 
-    String payload = """
+    String badPayload = """
             {
               "userId": "123",
               "username": "ab",
@@ -123,37 +203,17 @@ class ChatWebSocketHandlerTest {
             }
             """;
 
-    handler.handleTextMessage(session, new TextMessage(payload));
+    handler.handleTextMessage(session, new TextMessage(badPayload));
 
     JsonNode root = mapper.readTree(captureOneSentMessage(session).getPayload());
     assertEquals("VALIDATION_FAILED", root.get("errorCode").asText());
     String details = root.get("details").toString();
     assertTrue(details.contains("username must be 3-20 alphanumeric characters"));
     assertTrue(details.contains("timestamp must be in ISO-8601 format"));
+    verify(mockRoomManager, never()).addSession(any(), any());
   }
 
-  // ── successful publish ─────────────────────────────────────
-
-  @Test
-  void handleTextMessage_validMessage_publishesToRabbitMQ() throws Exception {
-    Channel mockChannel = mock(Channel.class);
-    ChannelPool mockPool = mock(ChannelPool.class);
-    when(mockPool.borrowChannel()).thenReturn(mockChannel);
-
-    ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
-    WebSocketSession session = mockSession();
-
-    handler.handleTextMessage(session, new TextMessage(validPayload()));
-
-    verify(session, never()).sendMessage(any());
-    verify(mockChannel).basicPublish(
-        eq(RabbitMQConfig.EXCHANGE_NAME),
-        eq("room.5"),
-        eq(MessageProperties.PERSISTENT_TEXT_PLAIN),
-        any(byte[].class)
-    );
-    verify(mockPool).returnChannel(mockChannel);
-  }
+  // ── publish failure ────────────────────────────────────────
 
   @Test
   void handleTextMessage_validMessage_returnsChannelEvenOnPublishFailure() throws Exception {
@@ -166,11 +226,9 @@ class ChatWebSocketHandlerTest {
     ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
     WebSocketSession session = mockSession();
 
-    assertDoesNotThrow(() -> handler.handleTextMessage(session, new TextMessage(validPayload())));
+    assertDoesNotThrow(() -> handler.handleTextMessage(session, new TextMessage(payload("TEXT"))));
     verify(mockPool).returnChannel(mockChannel);
   }
-
-  // ── circuit breaker ────────────────────────────────────────
 
   @Test
   void handleTextMessage_publishFailure_sendsPublishFailedError() throws Exception {
@@ -183,11 +241,13 @@ class ChatWebSocketHandlerTest {
     ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
     WebSocketSession session = mockSession();
 
-    handler.handleTextMessage(session, new TextMessage(validPayload()));
+    handler.handleTextMessage(session, new TextMessage(payload("TEXT")));
 
     JsonNode root = mapper.readTree(captureOneSentMessage(session).getPayload());
     assertEquals("PUBLISH_FAILED", root.get("errorCode").asText());
   }
+
+  // ── circuit breaker ────────────────────────────────────────
 
   @Test
   void handleTextMessage_afterCircuitOpens_sendsServiceUnavailable() throws Exception {
@@ -200,11 +260,11 @@ class ChatWebSocketHandlerTest {
     ChatWebSocketHandler handler = new ChatWebSocketHandler(mapper, mockPool, mockRoomManager);
 
     for (int i = 0; i < 5; i++) {
-      handler.handleTextMessage(mockSession(), new TextMessage(validPayload()));
+      handler.handleTextMessage(mockSession(), new TextMessage(payload("TEXT")));
     }
 
     WebSocketSession session = mockSession();
-    handler.handleTextMessage(session, new TextMessage(validPayload()));
+    handler.handleTextMessage(session, new TextMessage(payload("TEXT")));
 
     JsonNode root = mapper.readTree(captureOneSentMessage(session).getPayload());
     assertEquals("SERVICE_UNAVAILABLE", root.get("errorCode").asText());
