@@ -48,7 +48,7 @@ public class LoadTestRunner {
    * Total number of concurrent WebSocket worker threads.
    * Tunable value: 64 / 128 / 256 / 512 to find peak throughput.
    */
-  private static final int TOTAL_WORKERS = 128;
+  private static final int TOTAL_WORKERS = 256;
 
   /** Total number of messages sent during the load test. */
   private static final int TOTAL_MESSAGES = 500_000;
