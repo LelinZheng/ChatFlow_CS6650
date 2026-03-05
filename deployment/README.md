@@ -17,6 +17,8 @@ deployment/
 
 ## Local Setup
 
+`docker-compose.yml` runs both RabbitMQ and Redis on the same machine for local development only. In production each runs on its own EC2 instance.
+
 ### Prerequisites
 - Docker and Docker Compose installed
 
@@ -61,6 +63,7 @@ docker compose down
 | Data persistence | Docker volume `rabbitmq_data` |
 | Health check | `rabbitmq-diagnostics ping` every 10s |
 | Restart policy | `unless-stopped` |
+| Production deployment | Dedicated `t3.micro` EC2 instance running Docker |
 
 ### Redis
 | Setting | Value |
@@ -68,39 +71,54 @@ docker compose down
 | Image | `redis:7-alpine` |
 | Port | 6379 |
 | Restart policy | `unless-stopped` |
+| Production deployment | Dedicated `t3.micro` EC2 instance running Docker |
 
 ---
 
 ## AWS Deployment Architecture
 
+Each component runs on its own dedicated EC2 instance. RabbitMQ and Redis are each containerised with Docker on separate instances.
+
 ```
-                    ┌─────────────────────────┐
+                    ┌──────────────────────────┐
                     │  Application Load Balancer│
-                    │  port 80 · HTTP + WS     │
-                    └────────────┬────────────┘
+                    │  port 80 · HTTP + WS      │
+                    └────────────┬─────────────┘
                                  │
                ┌─────────────────┼─────────────────┐
                ▼                 ▼                 ▼
         ┌──────────┐      ┌──────────┐      ┌──────────┐
-        │Server-v2 │      │Server-v2 │  … │Server-v2 │
+        │Server-v2 │      │Server-v2 │  …  │Server-v2 │
         │t3.micro  │      │t3.micro  │      │t3.micro  │
         │port 8080 │      │port 8080 │      │port 8080 │
         └────┬─────┘      └────┬─────┘      └────┬─────┘
-             │                 │                 │
-             └─────────────────┼─────────────────┘
-                               │ publish / subscribe
-               ┌───────────────┼────────────────┐
-               ▼                                ▼
-        ┌──────────┐                    ┌──────────┐
-        │ RabbitMQ │                    │  Redis   │
-        │t3.micro  │──── consumer ────▶│t3.micro  │
-        │(Docker)  │                    │(Docker)  │
-        └──────────┘                    └──────────┘
-               ▲
-        ┌──────────┐
-        │ Consumer │
-        │t3.micro  │
-        └──────────┘
+             │  publish        │                 │
+             └─────────────────▼─────────────────┘
+                        ┌──────────┐
+                        │ RabbitMQ │
+                        │t3.micro  │
+                        │(Docker)  │
+                        └────┬─────┘
+                             │ consume
+                             ▼
+                        ┌──────────┐
+                        │ Consumer │
+                        │t3.micro  │
+                        └────┬─────┘
+                             │ publish
+                             ▼
+                        ┌──────────┐
+                        │  Redis   │
+                        │t3.micro  │
+                        │(Docker)  │
+                        └────┬─────┘
+                             │ subscribe (fanout)
+               ┌─────────────┼─────────────────┐
+               ▼             ▼                 ▼
+        ┌──────────┐  ┌──────────┐      ┌──────────┐
+        │Server-v2 │  │Server-v2 │  …  │Server-v2 │
+        │broadcast │  │broadcast │      │broadcast │
+        └──────────┘  └──────────┘      └──────────┘
 ```
 
 ---
@@ -111,7 +129,9 @@ docker compose down
 |---|---|---|---|
 | Server-v2 | t3.micro | 1 / 2 / 4 | Behind ALB |
 | Consumer | t3.micro | 1 | Fixed single instance |
-| RabbitMQ + Redis | t3.micro | 1 | Docker Compose |
+| RabbitMQ | t3.micro | 1 | Docker, dedicated instance |
+| Redis | t3.micro | 1 | Docker, dedicated instance |
+| **Total (4-server test)** | t3.micro | **7** | |
 
 ---
 
