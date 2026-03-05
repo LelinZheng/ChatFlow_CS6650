@@ -1,9 +1,12 @@
 package edu.northeastern.cs6650.client.metrics;
 
 import edu.northeastern.cs6650.client.model.MessageType;
+import java.io.PrintWriter;
 import java.io.Reader;
+import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVPrinter;
@@ -133,6 +136,118 @@ public class MetricsAnalyzer {
     }
 
     System.out.println("Throughput buckets CSV: " + outBucketsCsv.toAbsolutePath());
+  }
+
+  /**
+   * Same as {@link #analyzeAndPrint} but also appends the full analysis to {@code summaryPath}.
+   *
+   * <p>This is used by {@link edu.northeastern.cs6650.client.loadtest.LoadTestRunner}
+   * to persist the analysis alongside the raw CSV files for later comparison across runs.</p>
+   *
+   * @param metricsCsv    the path to the input metrics CSV file
+   * @param outBucketsCsv the path where throughput bucket CSV will be written
+   * @param summaryPath   the file to append the analysis output to
+   * @throws Exception if file I/O or CSV parsing fails
+   */
+  public void analyzeAndSave(Path metricsCsv, Path outBucketsCsv, Path summaryPath)
+      throws Exception {
+
+    List<Long> okLatencies = new ArrayList<>(500_000);
+
+    long ok = 0;
+    long failed = 0;
+    long minTs = Long.MAX_VALUE;
+    long maxTs = Long.MIN_VALUE;
+
+    Map<Integer, Long> okCountPerRoom = new HashMap<>();
+    Map<MessageType, Long> msgTypeCounts = new EnumMap<>(MessageType.class);
+    Map<Long, Integer> bucketCounts = new HashMap<>();
+
+    try (Reader reader = Files.newBufferedReader(metricsCsv)) {
+      Iterable<CSVRecord> records = CSVFormat.DEFAULT
+          .withFirstRecordAsHeader()
+          .parse(reader);
+
+      for (CSVRecord r : records) {
+        long ts = Long.parseLong(r.get("timestamp"));
+        String status = r.get("statusCode");
+        int roomId = Integer.parseInt(r.get("roomId"));
+
+        minTs = Math.min(minTs, ts);
+        maxTs = Math.max(maxTs, ts);
+
+        long bucketStart = (ts / 10_000L) * 10_000L;
+        bucketCounts.merge(bucketStart, 1, Integer::sum);
+
+        String mt = r.get("messageType");
+        if (mt != null && !mt.isEmpty()) {
+          MessageType type = MessageType.valueOf(mt);
+          msgTypeCounts.merge(type, 1L, Long::sum);
+        }
+
+        if ("OK".equals(status)) {
+          ok++;
+          long latencyRaw = Long.parseLong(r.get("latencyMs"));
+          okLatencies.add(latencyRaw);
+          okCountPerRoom.merge(roomId, 1L, Long::sum);
+        } else {
+          failed++;
+        }
+      }
+    }
+
+    writeThroughputBuckets(outBucketsCsv, bucketCounts);
+
+    Collections.sort(okLatencies);
+
+    double meanMs = meanMs(okLatencies);
+    double medianMs = percentileMs(okLatencies, 50);
+    double p95Ms = percentileMs(okLatencies, 95);
+    double p99Ms = percentileMs(okLatencies, 99);
+    double minMs = okLatencies.isEmpty() ? 0 : okLatencies.get(0);
+    double maxMs = okLatencies.isEmpty() ? 0 : okLatencies.get(okLatencies.size() - 1);
+
+    double durationSec = (maxTs > minTs) ? ((maxTs - minTs) / 1000.0) : 1.0;
+
+    // Build the analysis output into a string so it can go to both stdout and file
+    StringWriter sw = new StringWriter();
+    PrintWriter pw = new PrintWriter(sw);
+
+    pw.println("=== Metrics Summary ===");
+    pw.println("OK=" + ok + " failed=" + failed);
+    pw.printf("durationSec=%.3f%n", durationSec);
+
+    pw.println("=== Latency (OK only, ms) ===");
+    pw.printf("mean=%.3f%n", meanMs);
+    pw.printf("median=%.3f%n", medianMs);
+    pw.printf("p95=%.3f%n", p95Ms);
+    pw.printf("p99=%.3f%n", p99Ms);
+    pw.printf("min=%.3f max=%.3f%n", minMs, maxMs);
+
+    pw.println("=== Throughput per room (OK only, msg/s) ===");
+    Map<Integer, Double> throughputPerRoom = new TreeMap<>();
+    for (Map.Entry<Integer, Long> e : okCountPerRoom.entrySet()) {
+      throughputPerRoom.put(e.getKey(), e.getValue() / durationSec);
+    }
+    for (Map.Entry<Integer, Double> e : throughputPerRoom.entrySet()) {
+      pw.printf("room %d: %.2f%n", e.getKey(), e.getValue());
+    }
+
+    pw.println("=== Message type distribution (all statuses) ===");
+    for (Map.Entry<MessageType, Long> e : msgTypeCounts.entrySet()) {
+      pw.printf("%s: %d%n", e.getKey(), e.getValue());
+    }
+
+    pw.printf("Throughput buckets CSV: %s%n", outBucketsCsv.toAbsolutePath());
+    pw.flush();
+
+    String analysis = sw.toString();
+    System.out.print(analysis);
+
+    // Append analysis to the summary file (which already has the run results header)
+    Files.createDirectories(summaryPath.getParent());
+    Files.writeString(summaryPath, analysis, StandardOpenOption.APPEND, StandardOpenOption.CREATE);
+    System.out.println("Summary saved to: " + summaryPath.toAbsolutePath());
   }
 
   /**

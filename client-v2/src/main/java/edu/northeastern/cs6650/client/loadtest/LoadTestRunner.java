@@ -8,6 +8,7 @@ import edu.northeastern.cs6650.client.generator.MessageGenerator;
 import edu.northeastern.cs6650.client.util.RoomMembershipTracker;
 import edu.northeastern.cs6650.client.ws.ConnectionWorker;
 import java.net.URI;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -35,6 +36,11 @@ import java.util.concurrent.atomic.AtomicInteger;
  * <p>There is no warmup phase. The test runs a single main phase of
  * {@link #TOTAL_MESSAGES} messages, after which one poison-pill per worker is
  * enqueued to trigger graceful shutdown.</p>
+ *
+ * <p>Output files are automatically labeled with the worker count so successive
+ * runs do not overwrite each other. For a run with 256 workers, output files will be
+ * {@code main_metrics_256w.csv}, {@code throughput_10s_256w.csv}, and
+ * {@code summary_256w.txt}.</p>
  */
 public class LoadTestRunner {
 
@@ -58,6 +64,9 @@ public class LoadTestRunner {
 
   private final URI serverUri;
 
+  /** Short label appended to all output file names for this run (e.g., {@code "256w"}). */
+  private final String runLabel;
+
   /**
    * Constructs a LoadTestRunner targeting the given WebSocket endpoint.
    *
@@ -66,6 +75,7 @@ public class LoadTestRunner {
    */
   public LoadTestRunner(URI serverUri) {
     this.serverUri = serverUri;
+    this.runLabel = TOTAL_WORKERS + "w";
   }
 
   /**
@@ -82,10 +92,10 @@ public class LoadTestRunner {
     BlockingQueue<ChatMessage> sharedQueue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
     List<ConnectionWorker> workers = new ArrayList<>(TOTAL_WORKERS);
     BlockingQueue<MetricRecord> metricsQueue = new ArrayBlockingQueue<>(50_000);
-    Path outDir = Paths.get("..", "results");
+    Path outDir = Paths.get("..", "results/v2");
 
-    // Start metrics writer
-    Path mainCsvPath = outDir.resolve("main_metrics.csv");
+    // Start metrics writer — file labeled with worker count so runs don't overwrite each other
+    Path mainCsvPath = outDir.resolve("main_metrics_" + runLabel + ".csv");
     Thread metricsWriter = new Thread(
         new CsvMetricsWriter(metricsQueue, mainCsvPath), "metrics-writer");
     metricsWriter.start();
@@ -156,16 +166,31 @@ public class LoadTestRunner {
     int deadWorkers = (int) workers.stream().filter(w -> w.getOpens() == 0).count();
     int lostMessages = TOTAL_MESSAGES - totalOk - totalFailed;
 
-    System.out.println("\n=== Load Test Results ===");
-    System.out.println("OK=" + totalOk + " failed=" + totalFailed);
-    System.out.println("timeSec=" + String.format("%.2f", duration));
-    System.out.println("throughput msg/s=" + String.format("%.2f", throughput));
-    System.out.println("connections=" + totalConnections);
-    System.out.println("reconnections=" + totalReconnects);
-    System.out.println("connectionFailures=" + totalConnectionFailures);
-    System.out.println("deadWorkers=" + deadWorkers);
+    StringBuilder results = new StringBuilder();
+    results.append("\n=== Load Test Results (").append(runLabel).append(") ===\n");
+    results.append("workers=").append(TOTAL_WORKERS)
+        .append(" messages=").append(TOTAL_MESSAGES)
+        .append(" rooms=").append(ROOMS).append("\n");
+    results.append("OK=").append(totalOk).append(" failed=").append(totalFailed).append("\n");
+    results.append("timeSec=").append(String.format("%.2f", duration)).append("\n");
+    results.append("throughput msg/s=").append(String.format("%.2f", throughput)).append("\n");
+    results.append("connections=").append(totalConnections).append("\n");
+    results.append("reconnections=").append(totalReconnects).append("\n");
+    results.append("connectionFailures=").append(totalConnectionFailures).append("\n");
+    results.append("deadWorkers=").append(deadWorkers).append("\n");
     if (lostMessages != 0) {
-      System.out.println("WARNING messagesLost=" + lostMessages);
+      results.append("WARNING messagesLost=").append(lostMessages).append("\n");
+    }
+
+    System.out.print(results);
+
+    // Write results block to summary file (creates/overwrites per run)
+    Path summaryPath = outDir.resolve("summary_" + runLabel + ".txt");
+    try {
+      Files.createDirectories(outDir);
+      Files.writeString(summaryPath, results.toString());
+    } catch (Exception e) {
+      System.err.println("Failed to write summary file: " + e.getMessage());
     }
   }
 
@@ -174,11 +199,12 @@ public class LoadTestRunner {
    */
   public void printSummary() {
     System.out.println("\nLoad test summary:");
-    Path outDir = Paths.get("..", "results");
-    Path metricsCsv = outDir.resolve("main_metrics.csv");
-    Path bucketsCsv = outDir.resolve("throughput_10s.csv");
+    Path outDir = Paths.get("..", "results/v2");
+    Path metricsCsv = outDir.resolve("main_metrics_" + runLabel + ".csv");
+    Path bucketsCsv = outDir.resolve("throughput_10s_" + runLabel + ".csv");
+    Path summaryPath = outDir.resolve("summary_" + runLabel + ".txt");
     try {
-      new MetricsAnalyzer().analyzeAndPrint(metricsCsv, bucketsCsv);
+      new MetricsAnalyzer().analyzeAndSave(metricsCsv, bucketsCsv, summaryPath);
     } catch (Exception e) {
       System.err.println("Failed to analyze metrics: " + e.getMessage());
       e.printStackTrace();
