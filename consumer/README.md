@@ -128,6 +128,8 @@ Test coverage:
 
 ## Deployment (AWS EC2)
 
+The consumer runs on its own dedicated `t3.micro` instance. RabbitMQ and Redis each run on separate dedicated `t3.micro` instances (Docker). The consumer connects to both.
+
 - Instance type: `t3.micro`
 - Region: `us-west-2`
 - OS: Amazon Linux
