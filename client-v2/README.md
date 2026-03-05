@@ -1,296 +1,302 @@
-# Client Part 2: Performance Analysis
+# Client v2: Distributed Load Testing
 
-Enhanced WebSocket client with detailed per-message metrics, statistical analysis, and CSV export for visualization.
+WebSocket load test client for **CS6650 Assignment 2**, redesigned for the distributed server architecture.
+All workers share a single message queue, connect to `/chat`, and encode room in the message body — enabling tunable concurrency across 64 / 128 / 256 / 512 threads without per-room connection management.
 
 ---
 
 ## 📋 Features
 
-### All Part 1 Features
-- Warmup phase: 32 threads × 1000 messages
-- Main phase: 560 threads × 500K messages
-- Basic metrics reporting
+### Load Testing
+- Single shared `BlockingQueue` across all workers (no per-worker queues)
+- Tunable total worker count: **64 / 128 / 256 / 512**
+- All workers connect to `/chat` — room routing is in the message body
+- No warmup phase; single main phase of 500K messages
+- Configurable message count for stress tests (e.g. 1M)
 
-### Enhanced Metrics (Part 2)
-✨ **Per-Message Tracking**
-- Individual message latency (ms)
-- Timestamp for each message
-- Status code (OK, FAILED, NO_CONNECTION)
-- Room ID and message type
+### Message Generation
+- **Seed phase**: 1,000 unique JOIN messages generated first, priming the membership map
+- **Main phase**: 90% TEXT, 5% JOIN, 5% LEAVE — weighted distribution
+- Generator-side membership map (single-threaded `HashMap`) ensures TEXT and LEAVE messages always reference a room the user has joined — no discard-and-retry loop
+- Worker-side `RoomMembershipTracker` (`ConcurrentHashMap`) validates membership concurrently before each send
 
-✨ **Statistical Analysis**
-- Mean response time
-- Median response time
-- 95th percentile (p95)
-- 99th percentile (p99)
-- Min/max response times
-
-✨ **Performance Insights**
-- Throughput per room
-- Message type distribution
-- Time-series data (10-second buckets)
-
-✨ **Data Export**
-- CSV format for easy analysis
-- Compatible with Excel, Python, R
-- Ready for visualization
+### Metrics
+- Per-message latency (round-trip: send → Redis broadcast echo)
+- Status codes: `OK`, `FAILED_AFTER_RETRIES`, `NO_CONNECTION`, `INVALID_MEMBERSHIP`
+- Statistical analysis: mean, median, p95, p99, min, max latency
+- Throughput per room and message type distribution
+- Time-series throughput in 10-second buckets (queue profile graphs)
+- Output files labeled per run: `summary_256w.txt`, `main_metrics_256w.csv`, `throughput_10s_256w.csv`
 
 ---
 
 ## 🏗️ Architecture
 
-### Enhanced Threading Model
+### Threading Model
 ```
 Main Thread
-  ├── Generator Thread
-  ├── Worker Thread Pool (560 threads)
-  │   └── Each worker records latency per message
-  ├── Metrics Writer Thread  ← NEW!
-  │   └── Writes CSV in real-time
-  └── Metrics Analyzer  ← NEW!
-      └── Calculates statistics
+  ├── MetricsWriter Thread     (writes CSV in real time)
+  ├── Worker Pool (N threads)  (each holds one persistent WebSocket connection)
+  │   └── all workers pull from one shared BlockingQueue
+  └── Generator Thread
+      ├── Seed phase: 1000 unique JOIN messages
+      └── Main phase: 500K messages (90% TEXT / 5% JOIN / 5% LEAVE)
+          └── N poison pills (one per worker) to signal shutdown
 ```
 
-### Metrics Collection Flow
+### Message Flow
 ```
-Worker sends message
-  ↓ records timestamp
-WebSocket echo received
-  ↓ calculates latency
-MetricRecord created
-  ↓ put in queue
-CsvMetricsWriter
-  ↓ writes to CSV
-MetricsAnalyzer
-  ↓ reads CSV
-Statistical Summary
+MessageGenerator
+  └── shared BlockingQueue (capacity 10 000)
+        └── ConnectionWorker (×N)
+              ├── RoomMembershipTracker.validate()
+              ├── WebSocket send to /chat
+              └── wait for echo (Redis broadcast)
+                    └── MetricRecord → metricsQueue → CsvMetricsWriter
 ```
+
+### Key Design: Why Wait for Echo?
+Each message moves the worker's session to a new room on the server. The server only echoes the message back after it has been published to RabbitMQ, consumed, and re-broadcast via Redis. Sending the next message before receiving the echo would cause the session to switch rooms, orphaning the previous echo. The sequential send → wait → send protocol is required by this architecture.
 
 ---
 
 ## 🚀 Build and Run
 
 ### Prerequisites
-- Java 11 or higher
-- Maven 3.6+
-- Server running on target URL
+- Java 21
+- Maven 3.9+
+- server-v2, consumer, RabbitMQ, and Redis running
 
 ### Build
 ```bash
 mvn clean package
 ```
 
+This creates:
+- `target/chatflow-client-v2-1.0-SNAPSHOT-jar-with-dependencies.jar`
+
 ### Run
 ```bash
-java -jar target/chatflow-client-part2-1.0-SNAPSHOT-jar-with-dependencies.jar
+java -jar target/chatflow-client-v2-1.0-SNAPSHOT-jar-with-dependencies.jar
+```
+
+---
+
+## ⚙️ Configuration
+
+Edit constants in `LoadTestRunner.java` before each run:
+
+```java
+private static final int TOTAL_WORKERS  = 256;   // tune: 64 / 128 / 256 / 512
+private static final int TOTAL_MESSAGES = 500_000; // 1_000_000 for stress test
+private static final int ROOMS          = 20;
+private static final int QUEUE_CAPACITY = 10_000;
+```
+
+Edit the target URL in `LoadTestClient.java`:
+```java
+String httpBaseUrl = "http://localhost:8080";
+URI wsBaseUri = URI.create("ws://localhost:8080/chat");
+
+// For ALB:
+// String httpBaseUrl = "http://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com";
+// URI wsBaseUri = URI.create("ws://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com/chat");
 ```
 
 ---
 
 ## 📁 Output Files
 
-After running, find these files in `../results/` (repo root):
+After each run, files are saved to `../results/v2/` labeled with the worker count:
 
-### 1. main_metrics.csv
-Per-message metrics for main phase:
+### `summary_256w.txt`
+Human-readable results including load test stats and full latency analysis:
+```
+=== Load Test Results (256w) ===
+workers=256 messages=500000 rooms=20
+OK=499997 failed=3
+timeSec=88.56
+throughput msg/s=5646.04
+connections=512
+reconnections=286
+
+=== Latency (OK only, ms) ===
+mean=33.655
+median=34.000
+p95=41.000
+p99=45.000
+```
+
+### `main_metrics_256w.csv`
+Per-message records:
 ```csv
 timestamp,messageType,latencyMs,statusCode,roomId
-1707480123456,TEXT,35,OK,1
-1707480123457,JOIN,42,OK,5
-1707480123458,TEXT,31,OK,12
+1740000123456,TEXT,34,OK,5
+1740000123490,JOIN,38,OK,12
 ```
 
-**Location:** `../results/main_metrics.csv`
-
-### 2. warmup_metrics.csv
-Per-message metrics for warmup phase
-
-**Location:** `../results/warmup_metrics.csv`
-
-### 3. throughput_10s.csv
-Throughput in 10-second buckets:
+### `throughput_10s_256w.csv`
+10-second throughput buckets for queue profile graphs:
 ```csv
 bucketStartMillis,count,throughputMsgPerSec
-1707480120000,13450,1345.0
-1707480130000,13890,1389.0
+1740000120000,56460,5646.0
+1740000130000,56440,5644.0
 ```
-
-**Location:** `../results/throughput_10s.csv`
 
 ---
 
 ## 📊 Expected Output
 
-### Console Output
 ```
-=== Starting main phase ===
+Load Test Client Started
+workers=256 messages=500000
+Performing server health check...
+✓ Server health check passed
 
-All workers ready. Generating main phase messages and sending them...
+=== Starting Load Test ===
+workers=256 messages=500000 rooms=20
 
-=== Main Phase Results ===
-OK=500000 failed=0
-timeSec=36.370
-throughput msg/s=13742.28
-connections=560
-reconnections=0
-connectionFailures=356
+=== Load Test Results (256w) ===
+OK=499997 failed=3
+timeSec=88.56
+throughput msg/s=5646.04
+connections=512
+reconnections=286
+connectionFailures=0
 deadWorkers=0
-warmupConnectionsReused=32
-
-Load test summary:
-Main phase metrics to be aggregated here.
 
 === Metrics Summary ===
-OK=500000 failed=0
-durationSec=36.370
+OK=499997 failed=3
+durationSec=88.560
 
 === Latency (OK only, ms) ===
-mean=36.317
-median=35.000
-p95=48.000
-p99=63.000
-min=15.000 max=293.000
+mean=33.655
+median=34.000
+p95=41.000
+p99=45.000
+min=1.000 max=200.000
 
 === Throughput per room (OK only, msg/s) ===
-room 1: 753.02
-room 2: 759.94
-room 3: 755.89
+room 1: 280.10
 ...
-room 20: 710.34
+room 20: 283.44
 
 === Message type distribution (all statuses) ===
-TEXT: 450245
-JOIN: 24877
-LEAVE: 24878
-
-Throughput buckets CSV: ../results/throughput_10s.csv
+TEXT: 440997
+JOIN: 30001
+LEAVE: 28999
 ```
+
+---
+
+## 🔍 Understanding the Metrics
+
+### Status Codes
+| Code | Meaning |
+|---|---|
+| `OK` | Message echoed back successfully |
+| `FAILED_AFTER_RETRIES` | Failed after 5 retry attempts |
+| `NO_CONNECTION` | Worker never connected |
+| `INVALID_MEMBERSHIP` | TEXT or LEAVE sent when user not in room (dropped before send) |
+
+### Throughput vs Assignment 1
+Throughput (~5,000–7,000 msg/s with 256 workers) is lower than Assignment 1 (~13,000 msg/s) because the echo now travels through the full distributed pipeline: RabbitMQ → Consumer → Redis → Server → Client. Each message waits for this ~33ms round trip before the next is sent. Throughput scales linearly with worker count up to the pipeline saturation point.
+
+---
 
 ## 🧪 Testing
 
 ### Run Unit Tests
 ```bash
-# All tests
 mvn test
-
-# Specific test class
-mvn test -Dtest=MetricsAnalyzerTest
 ```
 
 ### Test Coverage
-- `MessageFactory`: Message generation logic
-- `MetricsAnalyzer`: Statistical calculations
-- `MetricRecord`: Data structure validation
-- `ChatMessage`: Poison pill detection
-- `RandomGenerator`: Range validation
+| Class | What is tested |
+|---|---|
+| `MessageGeneratorTest` | Seed phase, message counts, poison pills, membership invariants |
+| `RoomMembershipTrackerTest` | join/leave/isMember, concurrent access |
+| `ChatMessageTest` | Constructors, setters, poison pill detection |
+| `MetricRecordTest` | Data structure validation |
+| `MetricsAnalyzerTest` | Statistical calculations |
+| `MessageFactoryTest` | Message generation ranges |
+| `RandomGeneratorTest` | Boundary conditions |
 
 ---
 
-## ⚙️ Configuration
+## 🐛 Troubleshooting
 
-### Connection Per Room
+### Server Not Reachable
+```
+✗ Server health check failed: Connection refused
+```
+Ensure server-v2 is running and the URL in `LoadTestClient.java` is correct.
+
+### Workers Timeout (pool.awaitTermination)
+Increase the timeout in `LoadTestRunner.java` for large message counts:
 ```java
-// In LoadTestRunner.java
-int connPerRoom = 28; // must be >= 2 in order to reuse the warmup connections
+if (!pool.awaitTermination(240, TimeUnit.SECONDS)) { ... }
 ```
 
-
-### Output Directory Configuration
-
-**Current setup** (writes to `../results/`):
-```java
-// In LoadTestRunner.java
-Path outDir = Paths.get("..", "results");  // Writes to repo root
-Path csvPath = outDir.resolve("main_metrics.csv");
-```
-
-### Adjust Queue Sizes
-In `LoadTestRunner.java`:
-```java
-int queueCapacity = 3000;  // Per-worker message queue
-BlockingQueue<MetricRecord> metricsQueue = new ArrayBlockingQueue<>(50_000);
-```
-
----
-
-## 🔍 Understanding Detailed Metrics
-
-### Status Codes
-| Code | Meaning |
-|------|---------|
-| `OK` | Message successfully sent and acknowledged |
-| `FAILED_AFTER_RETRIES` | Failed after 5 retry attempts |
-| `NO_CONNECTION` | Worker never connected, message not sent |
-| `TIMEOUT` | Echo not received within timeout period |
-
-### Latency Values
-- `> 0`: Actual round-trip time in milliseconds
-- `-1`: Message failed (check status code)
-
----
-
-## 📊 Performance Tuning
-
-### If Throughput Too Low
-1. Increase or decrease connections per room: `connPerRoom = 35`
-2. Reduce queue capacity to decrease memory: `queueCapacity = 2000`
-3. Disable console logging for workers
-
-
-### If Out of Memory
+### Out of Memory
 ```bash
-java -Xmx4G -Xms2G -jar target/chatflow-client-part2-1.0-SNAPSHOT-jar-with-dependencies.jar
+java -Xmx4G -jar target/chatflow-client-v2-1.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
 ---
 
 ## 📁 Project Structure
+
 ```
-client-part2/
+client-v2/
 ├── pom.xml
 ├── README.md
-├── src/
-│   ├── main/
-│   │   └── java/
-│   │       └── edu/northeastern/cs6650/client/
-│   │           ├── LoadTestClient.java
-│   │           ├── generator/
-│   │           │   └── MainPhaseMessageGenerator.java
-│   │           ├── loadtest/
-│   │           │   └── LoadTestRunner.java
-│   │           ├── metrics/              ← NEW in Part 2
-│   │           │   ├── CsvMetricsWriter.java
-│   │           │   ├── MetricRecord.java
-│   │           │   └── MetricsAnalyzer.java
-│   │           ├── model/
-│   │           │   ├── ChatMessage.java
-│   │           │   └── MessageType.java
-│   │           ├── util/
-│   │           │   ├── MessageFactory.java
-│   │           │   └── RandomGenerator.java
-│   │           └── ws/
-│   │               └── ConnectionWorker.java
-│   └── test/
-│       └── java/
-│           └── edu/northeastern/cs6650/client/
-│               ├── metrics/
-│               │   ├── MetricRecordTest.java
-│               │   └── MetricsAnalyzerTest.java
-│               ├── model/
-│               │   └── ChatMessageTest.java
-│               └── util/
-│                   ├── MessageFactoryTest.java
-│                   └── RandomGeneratorTest.java
-└── target/
-    └── (compiled artifacts)
+└── src/
+    ├── main/
+    │   └── java/edu/northeastern/cs6650/client/
+    │       ├── LoadTestClient.java              # Entry point, health check
+    │       ├── generator/
+    │       │   └── MessageGenerator.java        # Seed phase + main phase
+    │       ├── loadtest/
+    │       │   └── LoadTestRunner.java          # Orchestrator, labeled output
+    │       ├── metrics/
+    │       │   ├── CsvMetricsWriter.java
+    │       │   ├── MetricRecord.java
+    │       │   └── MetricsAnalyzer.java         # Stats + file save
+    │       ├── model/
+    │       │   ├── ChatMessage.java
+    │       │   └── MessageType.java
+    │       ├── util/
+    │       │   ├── MessageFactory.java
+    │       │   ├── RandomGenerator.java
+    │       │   └── RoomMembershipTracker.java   # Thread-safe membership
+    │       └── ws/
+    │           └── ConnectionWorker.java        # WebSocket worker
+    └── test/
+        └── java/edu/northeastern/cs6650/client/
+            ├── generator/
+            │   └── MessageGeneratorTest.java
+            ├── metrics/
+            │   ├── MetricRecordTest.java
+            │   └── MetricsAnalyzerTest.java
+            ├── model/
+            │   └── ChatMessageTest.java
+            └── util/
+                ├── MessageFactoryTest.java
+                ├── RandomGeneratorTest.java
+                └── RoomMembershipTrackerTest.java
 ```
 
 ### Output Files (at repo root)
 ```
-../results/                   ← Repo root level
-├── main_metrics.csv          ← Generated by client-part2
-├── warmup_metrics.csv        ← Generated by client-part2
-└──throughput_10s.csv         ← Generated by client-part2
+../results/v2/
+├── summary_64w.txt
+├── summary_128w.txt
+├── summary_256w.txt
+├── summary_512w.txt
+├── main_metrics_256w.csv
+├── throughput_10s_256w.csv
+└── graphs/                    ← generated by monitoring/plot_results.py
 ```
 
 ---
@@ -298,6 +304,15 @@ client-part2/
 ## 🔗 Related Documentation
 
 - [Main Project README](../README.md)
-- [Client Part 1 (Basic)](../client-part1/README.md)
-- [Test Results & Analysis](../results/README.md)
-- [Server Documentation](../server/README.md)
+- [Server v2](../server-v2/README.md)
+- [Consumer](../consumer/README.md)
+- [Monitoring & Graphs](../monitoring/)
+- [Architecture Document](../doc/architecture.md)
+
+---
+
+## 📝 Notes
+
+- Output files are labeled with the worker count so successive runs never overwrite each other
+- The generator seed phase (1,000 JOINs) is included in the `TOTAL_MESSAGES` count
+- `INVALID_MEMBERSHIP` drops happen at the worker level before any network call — they indicate a race between the generator and workers on the shared membership state, which is expected to be rare
