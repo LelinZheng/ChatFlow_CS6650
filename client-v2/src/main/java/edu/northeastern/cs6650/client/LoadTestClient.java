@@ -30,10 +30,10 @@ public class LoadTestClient {
    */
   public static void main(String[] args) {
     System.out.println("Load Test Client Started");
-    String httpBaseUrl = "http://localhost:8080";
-    URI wsBaseUri = URI.create("ws://localhost:8080/chat");
-//    String httpBaseUrl = "http://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com";
-//    URI wsBaseUri = URI.create("ws://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com/chat");
+//    String httpBaseUrl = "http://localhost:8080";
+//    URI wsBaseUri = URI.create("ws://localhost:8080/chat");
+    String httpBaseUrl = "http://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com";
+    URI wsBaseUri = URI.create("ws://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com/chat");
 
     System.out.println("Performing server health check...");
     if (!checkServerHealth(httpBaseUrl)) {
