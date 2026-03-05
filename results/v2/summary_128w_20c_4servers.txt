@@ -1,0 +1,45 @@
+
+=== Load Test Results (128w) ===
+workers=128 messages=500000 rooms=20
+OK=499997 failed=3
+timeSec=168.58
+throughput msg/s=2966.01
+connections=128
+reconnections=0
+connectionFailures=0
+deadWorkers=0
+=== Metrics Summary ===
+OK=499997 failed=3
+durationSec=168.231
+=== Latency (OK only, ms) ===
+mean=42.568
+median=9.000
+p95=199.000
+p99=309.000
+min=0.000 max=1158.000
+=== Throughput per room (OK only, msg/s) ===
+room 1: 155.39
+room 2: 148.02
+room 3: 151.70
+room 4: 143.86
+room 5: 144.33
+room 6: 147.94
+room 7: 143.41
+room 8: 146.65
+room 9: 147.31
+room 10: 146.95
+room 11: 158.45
+room 12: 149.76
+room 13: 151.27
+room 14: 157.35
+room 15: 148.58
+room 16: 150.45
+room 17: 149.35
+room 18: 140.01
+room 19: 145.75
+room 20: 145.57
+=== Message type distribution (all statuses) ===
+JOIN: 25876
+TEXT: 449122
+LEAVE: 25002
+Throughput buckets CSV: /Users/lelinzheng/Developer/Northeastern/ChatFlow_CS6650/client-v2/../results/v2/throughput_10s_128w.csv
