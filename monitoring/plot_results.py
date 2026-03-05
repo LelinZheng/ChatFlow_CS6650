@@ -7,27 +7,38 @@ Reads from ../results/v2/ and produces PNG files in ../results/v2/graphs/.
 Input files (all optional — graphs are skipped if the file doesn't exist):
     summary_{N}w.txt              - per-run summary from the load test client
     throughput_10s_{N}w.csv       - 10-second throughput buckets from client
-    rabbitmq_metrics_{N}w.csv     - queue depth + rates from collect_rabbitmq_metrics.sh
+    summary_{N}w_{S}srv.txt       - summary renamed after each server-count run
+    summary_256w_{C}c.txt         - summary renamed after each consumer-thread run
 
 Output graphs:
-    01_throughput_vs_workers.png      - bar chart: throughput by worker count
+    01_throughput_vs_workers.png      - bar chart: throughput by worker count (single server)
     02_latency_vs_workers.png         - line chart: mean + p95 latency by worker count
-    03_throughput_over_time_{N}w.png  - queue profile (throughput stability) per run
-    04_queue_depth_over_time_{N}w.png - queue depth during test per run
-    05_scalability_comparison.png     - 1 vs 2 vs 4 servers throughput (if data exists)
-    06_consumer_rate_vs_depth_{N}w.png - publish vs deliver rate + depth overlay per run
+    03_throughput_over_time_{N}w.png  - throughput stability (queue profile) per run
+    04_scalability_comparison.png     - 1 vs 2 vs 4 servers throughput
+    05_consumer_thread_tuning.png     - throughput vs consumer thread count
 
 Usage:
     pip install pandas matplotlib
     python3 plot_results.py [results_dir]
 
     results_dir defaults to ../results/v2 (relative to this script's location)
+
+Naming convention for multi-run files:
+    After each server-count test, copy and rename the summary:
+        cp summary_256w.txt summary_256w_1srv.txt   (single server baseline)
+        cp summary_256w.txt summary_256w_2srv.txt   (2-server LB run)
+        cp summary_256w.txt summary_256w_4srv.txt   (4-server LB run)
+
+    After each consumer-thread test, copy and rename the summary:
+        cp summary_256w.txt summary_256w_10c.txt
+        cp summary_256w.txt summary_256w_20c.txt
+        cp summary_256w.txt summary_256w_40c.txt
+        cp summary_256w.txt summary_256w_80c.txt
 """
 
 import os
 import re
 import sys
-import glob
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')  # headless — saves PNG without needing a display
@@ -43,7 +54,7 @@ GRAPHS_DIR  = os.path.join(RESULTS_DIR, "graphs")
 
 os.makedirs(GRAPHS_DIR, exist_ok=True)
 
-WORKER_COUNTS = [64, 128, 256, 512]   # expected labels to look for
+WORKER_COUNTS = [64, 128, 256, 512]
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -52,9 +63,6 @@ def summary_path(n):
 
 def buckets_path(n):
     return os.path.join(RESULTS_DIR, f"throughput_10s_{n}w.csv")
-
-def rabbitmq_path(n):
-    return os.path.join(RESULTS_DIR, f"rabbitmq_metrics_{n}w.csv")
 
 def out(name):
     path = os.path.join(GRAPHS_DIR, name)
@@ -71,19 +79,19 @@ def parse_summary(path):
         return None
 
     patterns = {
-        "workers":    r"workers=(\d+)",
-        "throughput": r"throughput msg/s=([\d.]+)",
-        "timeSec":    r"timeSec=([\d.]+)",
-        "ok":         r"^OK=(\d+)",
-        "failed":     r"failed=(\d+)",
-        "connections":r"connections=(\d+)",
+        "workers":       r"workers=(\d+)",
+        "throughput":    r"throughput msg/s=([\d.]+)",
+        "timeSec":       r"timeSec=([\d.]+)",
+        "ok":            r"^OK=(\d+)",
+        "failed":        r"failed=(\d+)",
+        "connections":   r"connections=(\d+)",
         "reconnections": r"reconnections=(\d+)",
-        "mean":       r"mean=([\d.]+)",
-        "median":     r"median=([\d.]+)",
-        "p95":        r"p95=([\d.]+)",
-        "p99":        r"p99=([\d.]+)",
-        "min_lat":    r"min=([\d.]+)",
-        "max_lat":    r"max=([\d.]+)",
+        "mean":          r"mean=([\d.]+)",
+        "median":        r"median=([\d.]+)",
+        "p95":           r"p95=([\d.]+)",
+        "p99":           r"p99=([\d.]+)",
+        "min_lat":       r"min=([\d.]+)",
+        "max_lat":       r"max=([\d.]+)",
     }
     for key, pat in patterns.items():
         m = re.search(pat, text, re.MULTILINE)
@@ -112,16 +120,16 @@ print(f"Found summary data for workers: {sorted(summaries.keys())}")
 print(f"Writing graphs to: {GRAPHS_DIR}\n")
 
 workers_with_data = sorted(summaries.keys())
+labels = [f"{n}w" for n in workers_with_data]
 
 # ── Graph 1: Throughput vs Worker Count (bar chart) ───────────────────────────
 
-fig, ax = plt.subplots(figsize=(8, 5))
-labels = [f"{n}w" for n in workers_with_data]
 values = [summaries[n]["throughput"] for n in workers_with_data]
 
+fig, ax = plt.subplots(figsize=(8, 5))
 bars = ax.bar(labels, values, color="#4C72B0", width=0.5, edgecolor="white")
 ax.bar_label(bars, fmt="%.0f", padding=4, fontsize=10)
-ax.set_title("Throughput vs Client Thread Count", fontsize=14, fontweight="bold")
+ax.set_title("Throughput vs Client Thread Count (Single Server)", fontsize=14, fontweight="bold")
 ax.set_xlabel("Client Threads")
 ax.set_ylabel("Throughput (msg/s)")
 ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{x:,.0f}"))
@@ -155,14 +163,13 @@ save(fig, "02_latency_vs_workers.png")
 for n in workers_with_data:
     path = buckets_path(n)
     if not os.path.exists(path):
-        print(f"  Skipping throughput-over-time for {n}w (file not found)")
+        print(f"  Skipping throughput-over-time for {n}w (throughput_10s_{n}w.csv not found)")
         continue
 
     df = pd.read_csv(path)
     if df.empty:
         continue
 
-    # Convert bucket start ms to elapsed seconds from test start
     t0 = df["bucketStartMillis"].iloc[0]
     df["elapsed_s"] = (df["bucketStartMillis"] - t0) / 1000.0
 
@@ -179,57 +186,11 @@ for n in workers_with_data:
     ax.grid(alpha=0.3)
     save(fig, f"03_throughput_over_time_{n}w.png")
 
-# ── Graph 4: Queue depth over time (from RabbitMQ metrics) ────────────────────
-
-for n in workers_with_data:
-    path = rabbitmq_path(n)
-    if not os.path.exists(path):
-        print(f"  Skipping queue-depth for {n}w (rabbitmq_metrics_{n}w.csv not found — run collect_rabbitmq_metrics.sh during test)")
-        continue
-
-    df = pd.read_csv(path)
-    if df.empty:
-        continue
-
-    t0 = df["timestamp_ms"].iloc[0]
-    df["elapsed_s"] = (df["timestamp_ms"] - t0) / 1000.0
-
-    fig, ax1 = plt.subplots(figsize=(12, 5))
-
-    color_depth = "#4C72B0"
-    color_pub   = "#55A868"
-    color_del   = "#DD8452"
-
-    ax1.fill_between(df["elapsed_s"], df["queue_depth"], alpha=0.2, color=color_depth)
-    ax1.plot(df["elapsed_s"], df["queue_depth"], linewidth=1.5,
-             color=color_depth, label="Queue depth")
-    ax1.set_xlabel("Elapsed Time (s)")
-    ax1.set_ylabel("Queue Depth (messages)", color=color_depth)
-    ax1.tick_params(axis="y", labelcolor=color_depth)
-
-    ax2 = ax1.twinx()
-    ax2.plot(df["elapsed_s"], df["publish_rate"], linewidth=1.5,
-             color=color_pub,  linestyle="--", label="Publish rate")
-    ax2.plot(df["elapsed_s"], df["deliver_rate"], linewidth=1.5,
-             color=color_del,  linestyle=":",  label="Deliver rate")
-    ax2.set_ylabel("Rate (msg/s)", color="black")
-
-    # Combine legends from both axes
-    lines1, labels1 = ax1.get_legend_handles_labels()
-    lines2, labels2 = ax2.get_legend_handles_labels()
-    ax1.legend(lines1 + lines2, labels1 + labels2, loc="upper right")
-
-    ax1.set_title(f"Queue Depth & Message Rates — {n} workers", fontsize=13, fontweight="bold")
-    ax1.grid(alpha=0.3)
-    save(fig, f"04_queue_depth_over_time_{n}w.png")
-
-# ── Graph 5: Scalability comparison (1 / 2 / 4 servers) ──────────────────────
-# Looks for files named summary_256w_1srv.txt, summary_256w_2srv.txt, summary_256w_4srv.txt
-# (You create these by copying/renaming the summary files from each server count run.)
+# ── Graph 4: Scalability comparison (1 / 2 / 4 servers) ──────────────────────
+# Looks for summary_{N}w_{S}srv.txt — copy and rename after each server-count run.
 
 scalability = {}
 for srv in [1, 2, 4]:
-    # Try the best worker count first, then fall back to any available
     for n in [256, 512, 128, 64]:
         path = os.path.join(RESULTS_DIR, f"summary_{n}w_{srv}srv.txt")
         if os.path.exists(path):
@@ -239,30 +200,32 @@ for srv in [1, 2, 4]:
                 break
 
 if len(scalability) >= 2:
-    srv_labels = [f"{s} server{'s' if s > 1 else ''}" for s in sorted(scalability)]
-    srv_values = [scalability[s]["throughput"] for s in sorted(scalability)]
+    srv_keys   = sorted(scalability)
+    srv_labels = [f"{s} server{'s' if s > 1 else ''}" for s in srv_keys]
+    srv_values = [scalability[s]["throughput"] for s in srv_keys]
 
     fig, ax = plt.subplots(figsize=(7, 5))
-    bars = ax.bar(srv_labels, srv_values, color=["#4C72B0", "#55A868", "#DD8452"][:len(srv_labels)],
+    bars = ax.bar(srv_labels, srv_values,
+                  color=["#4C72B0", "#55A868", "#DD8452"][:len(srv_keys)],
                   width=0.5, edgecolor="white")
     ax.bar_label(bars, fmt="%.0f", padding=4, fontsize=10)
     base = srv_values[0]
     for i, v in enumerate(srv_values):
-        ax.annotate(f"×{v/base:.1f}", (srv_labels[i], v + max(srv_values)*0.03),
+        ax.annotate(f"×{v/base:.1f}",
+                    (srv_labels[i], v + max(srv_values) * 0.03),
                     ha="center", fontsize=9, color="gray")
     ax.set_title("Throughput Scalability: 1 vs 2 vs 4 Servers", fontsize=13, fontweight="bold")
     ax.set_ylabel("Throughput (msg/s)")
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{x:,.0f}"))
     ax.grid(axis="y", alpha=0.3)
     ax.set_ylim(0, max(srv_values) * 1.25)
-    save(fig, "05_scalability_comparison.png")
+    save(fig, "04_scalability_comparison.png")
 else:
-    print("  Skipping scalability graph (need summary_*w_1srv.txt, _2srv.txt, _4srv.txt)")
-    print("  After each server-count test, copy the summary file and rename it with the _Nsrv suffix.")
+    print("  Skipping scalability graph — need summary_*w_1srv.txt, _2srv.txt, _4srv.txt")
+    print("  After each server-count run: cp summary_256w.txt summary_256w_Nsrv.txt")
 
-# ── Graph 6: Consumer thread tuning ───────────────────────────────────────────
-# Looks for summary_256w_10c.txt, summary_256w_20c.txt, etc.
-# (Copy/rename summary files from consumer thread count runs)
+# ── Graph 5: Consumer thread tuning ───────────────────────────────────────────
+# Looks for summary_256w_{C}c.txt — copy and rename after each consumer-thread run.
 
 consumer_runs = {}
 for c in [10, 20, 40, 80]:
@@ -273,8 +236,9 @@ for c in [10, 20, 40, 80]:
             consumer_runs[c] = d
 
 if len(consumer_runs) >= 2:
-    c_labels = [f"{c} consumers" for c in sorted(consumer_runs)]
-    c_values = [consumer_runs[c]["throughput"] for c in sorted(consumer_runs)]
+    c_keys   = sorted(consumer_runs)
+    c_labels = [f"{c}" for c in c_keys]
+    c_values = [consumer_runs[c]["throughput"] for c in c_keys]
 
     fig, ax = plt.subplots(figsize=(8, 5))
     bars = ax.bar(c_labels, c_values, color="#8172B2", width=0.5, edgecolor="white")
@@ -285,9 +249,9 @@ if len(consumer_runs) >= 2:
     ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"{x:,.0f}"))
     ax.grid(axis="y", alpha=0.3)
     ax.set_ylim(0, max(c_values) * 1.2)
-    save(fig, "06_consumer_thread_tuning.png")
+    save(fig, "05_consumer_thread_tuning.png")
 else:
-    print("  Skipping consumer tuning graph (need summary_256w_10c.txt, _20c.txt, etc.)")
-    print("  After each consumer-thread test, copy the summary file with the _Nc suffix.")
+    print("  Skipping consumer tuning graph — need summary_256w_10c.txt, _20c.txt, etc.")
+    print("  After each consumer-thread run: cp summary_256w.txt summary_256w_Nc.txt")
 
 print("\nDone.")
