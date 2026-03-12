@@ -1,7 +1,7 @@
 # Deployment
 
-This directory contains infrastructure configuration for **CS6650 Assignment 2**.
-It provides the Docker Compose setup for running RabbitMQ and Redis locally or on a single EC2 instance, along with notes on the AWS deployment configuration.
+This directory contains infrastructure configuration for **CS6650 Assignment 3**.
+It provides the Docker Compose setup for running RabbitMQ, Redis, and PostgreSQL locally, along with notes on the AWS deployment configuration.
 
 ---
 
@@ -9,7 +9,7 @@ It provides the Docker Compose setup for running RabbitMQ and Redis locally or o
 
 ```
 deployment/
-├── docker-compose.yml    # RabbitMQ + Redis
+├── docker-compose.yml    # RabbitMQ + Redis + PostgreSQL
 └── README.md
 ```
 
@@ -17,20 +17,20 @@ deployment/
 
 ## Local Setup
 
-`docker-compose.yml` runs both RabbitMQ and Redis on the same machine for local development only. In production each runs on its own EC2 instance.
+`docker-compose.yml` runs RabbitMQ, Redis, and PostgreSQL on the same machine for local development only. In production, RabbitMQ and Redis each run on their own EC2 instance, and PostgreSQL runs on AWS RDS.
 
 ### Prerequisites
 - Docker and Docker Compose installed
 
-### Start RabbitMQ and Redis
+### Start all services
 ```bash
 cd deployment
-
-# Set credentials (or export in your shell)
-export RABBITMQ_USER=admin
-export RABBITMQ_PASS=admin123
-
 docker compose up -d
+```
+
+Start only PostgreSQL (e.g. for schema work without the full stack):
+```bash
+docker compose up -d postgres
 ```
 
 ### Verify
@@ -42,6 +42,15 @@ open http://localhost:15672
 # Redis
 redis-cli ping
 # Expected: PONG
+
+# PostgreSQL
+psql -h localhost -U chatflow -d chatflow
+# Password: chatflow123
+```
+
+### Reset database between load test runs
+```bash
+psql -h localhost -U chatflow -d chatflow -c "TRUNCATE messages;"
 ```
 
 ### Stop
@@ -73,6 +82,18 @@ docker compose down
 | Restart policy | `unless-stopped` |
 | Production deployment | Dedicated `t3.micro` EC2 instance running Docker |
 
+### PostgreSQL
+| Setting | Value |
+|---|---|
+| Image | `postgres:16` |
+| Port | 5432 |
+| Default credentials | `chatflow` / `chatflow123` |
+| Database | `chatflow` |
+| Data persistence | Docker volume `postgres_data` |
+| Health check | `pg_isready` every 10s |
+| Restart policy | `unless-stopped` |
+| Production deployment | AWS RDS (PostgreSQL) — persists independently of EC2 instances |
+
 ---
 
 ## AWS Deployment Architecture
@@ -102,9 +123,17 @@ Each component runs on its own dedicated EC2 instance. RabbitMQ and Redis are ea
                              │ consume
                              ▼
                         ┌──────────┐
-                        │ Consumer │
+                        │Consumer  │
+                        │  v3      │
                         │t3.micro  │
                         └────┬─────┘
+                             │ write (batch)
+                             ▼
+                        ┌──────────┐
+                        │   RDS    │
+                        │PostgreSQL│
+                        │(managed) │
+                        └──────────┘
                              │ publish
                              ▼
                         ┌──────────┐
@@ -128,10 +157,11 @@ Each component runs on its own dedicated EC2 instance. RabbitMQ and Redis are ea
 | Component | Instance Type | Count | Notes |
 |---|---|---|---|
 | Server-v2 | t3.micro | 1 / 2 / 4 | Behind ALB |
-| Consumer | t3.micro | 1 | Fixed single instance |
+| Consumer-v3 | t3.micro | 1 | Fixed single instance |
 | RabbitMQ | t3.micro | 1 | Docker, dedicated instance |
 | Redis | t3.micro | 1 | Docker, dedicated instance |
-| **Total (4-server test)** | t3.micro | **7** | |
+| PostgreSQL | RDS db.t3.micro | 1 | AWS managed, persists across sessions |
+| **Total (4-server test)** | t3.micro | **7** + 1 RDS | |
 
 ---
 
