@@ -14,6 +14,7 @@ import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Delivery;
 import com.rabbitmq.client.Envelope;
+import edu.northeastern.cs6650.consumer.db.BatchWriter;
 import edu.northeastern.cs6650.consumer.model.ChatMessage;
 import edu.northeastern.cs6650.consumer.redis.RedisPublisher;
 import java.nio.charset.StandardCharsets;
@@ -31,6 +32,7 @@ class RoomConsumerTest {
 
   private Channel mockChannel;
   private RedisPublisher mockRedisPublisher;
+  private BatchWriter mockBatchWriter;
   private RoomConsumer consumer;
 
   private String validPayload(String messageId, String roomId) throws Exception {
@@ -51,7 +53,8 @@ class RoomConsumerTest {
   void setUp() {
     mockChannel = mock(Channel.class);
     mockRedisPublisher = mock(RedisPublisher.class);
-    consumer = new RoomConsumer(mockChannel, List.of("room.5"), mockRedisPublisher);
+    mockBatchWriter = mock(BatchWriter.class);
+    consumer = new RoomConsumer(mockChannel, List.of("room.5"), mockRedisPublisher, mockBatchWriter);
   }
 
   // ── successful delivery ────────────────────────────────────
@@ -65,6 +68,7 @@ class RoomConsumerTest {
 
     verify(mockRedisPublisher).publish("5", payload);
     verify(mockChannel).basicAck(1L, false);
+    verify(mockBatchWriter).enqueue(any(ChatMessage.class));
     verify(mockChannel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
   }
 
