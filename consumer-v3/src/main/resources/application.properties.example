@@ -14,3 +14,29 @@ rabbitmq.password=your_password
 # Consumer tuning
 consumer.thread.count=10
 consumer.prefetch.count=10
+
+# PostgreSQL DataSource
+spring.datasource.url=jdbc:postgresql://localhost:5432/chatflow
+spring.datasource.username=your_db_username
+spring.datasource.password=your_db_password
+spring.datasource.driver-class-name=org.postgresql.Driver
+
+# HikariCP
+spring.datasource.hikari.pool-name=ChatFlowPool
+spring.datasource.hikari.maximum-pool-size=10
+spring.datasource.hikari.minimum-idle=2
+spring.datasource.hikari.idle-timeout=30000
+spring.datasource.hikari.connection-timeout=5000
+spring.datasource.hikari.max-lifetime=600000
+spring.datasource.hikari.leak-detection-threshold=60000
+
+# Batch writer tuning
+db.batch.size=500
+db.flush.interval.ms=500
+db.writer.thread.count=2
+db.buffer.max.size=50000
+db.max.retries=3
+
+# Circuit breaker
+db.circuit.failure.threshold=5
+db.circuit.recovery.timeout.ms=30000
