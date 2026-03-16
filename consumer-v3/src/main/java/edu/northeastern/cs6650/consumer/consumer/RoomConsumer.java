@@ -2,6 +2,7 @@ package edu.northeastern.cs6650.consumer.consumer;
 
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Delivery;
+import edu.northeastern.cs6650.consumer.db.BatchWriter;
 import edu.northeastern.cs6650.consumer.model.ChatMessage;
 import edu.northeastern.cs6650.consumer.redis.RedisPublisher;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +41,7 @@ public class RoomConsumer implements Runnable {
   private final Channel channel;
   private final List<String> assignedQueues;
   private final RedisPublisher redisPublisher;
+  private final BatchWriter batchWriter;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   // duplicate detection: messageId -> time delivered
@@ -51,12 +53,14 @@ public class RoomConsumer implements Runnable {
    * @param channel         dedicated RabbitMQ channel for this thread
    * @param assignedQueues  list of queue names this consumer subscribes to (e.g. "room.1")
    * @param redisPublisher  publishes messages to Redis Pub/Sub for server fanout
+   * @param batchWriter     buffers messages for batch DB persistence
    */
   public RoomConsumer(Channel channel, List<String> assignedQueues,
-      RedisPublisher redisPublisher) {
+      RedisPublisher redisPublisher, BatchWriter batchWriter) {
     this.channel = channel;
     this.assignedQueues = assignedQueues;
     this.redisPublisher = redisPublisher;
+    this.batchWriter = batchWriter;
   }
 
   /**
@@ -110,7 +114,7 @@ public class RoomConsumer implements Runnable {
       }
 
       String payload = new String(delivery.getBody(), StandardCharsets.UTF_8);
-      broadcastWithRetry(msg.getRoomId(), payload, deliveryTag);
+      broadcastWithRetry(msg, payload, deliveryTag);
 
     } catch (Exception e) {
       log.error("Failed to process delivery {}: {}", deliveryTag, e.getMessage());
@@ -119,31 +123,33 @@ public class RoomConsumer implements Runnable {
   }
 
   /**
-   * Publishes a message to the Redis channel for {@code roomId} via {@link RedisPublisher},
+   * Publishes a message to the Redis channel for the message's room via {@link RedisPublisher},
    * retrying up to {@link #MAX_RETRIES} times with exponential backoff on failure.
-   * Acknowledges to RabbitMQ on success, nacks without requeue after all retries exhausted.
+   * Acknowledges to RabbitMQ on success and enqueues the message for DB persistence.
+   * Nacks without requeue after all retries exhausted.
    *
-   * @param roomId      the room to broadcast to
+   * @param msg         the deserialized chat message
    * @param payload     the raw JSON string to send to all server instances
    * @param deliveryTag RabbitMQ delivery tag used for ack/nack
    */
-  private void broadcastWithRetry(String roomId, String payload, long deliveryTag) {
+  private void broadcastWithRetry(ChatMessage msg, String payload, long deliveryTag) {
     int attempt = 0;
     while (attempt < MAX_RETRIES) {
       try {
-        redisPublisher.publish(roomId, payload);
+        redisPublisher.publish(msg.getRoomId(), payload);
         ack(deliveryTag);
+        batchWriter.enqueue(msg);
         return;
       } catch (Exception e) {
         attempt++;
         if (attempt == MAX_RETRIES) {
-          log.error("Broadcast to room {} failed after {} attempts", roomId, MAX_RETRIES);
+          log.error("Broadcast to room {} failed after {} attempts", msg.getRoomId(), MAX_RETRIES);
           nack(deliveryTag);
           return;
         }
         long backoff = BASE_BACKOFF_MS * (1L << attempt); // 200ms, 400ms, 800ms
         log.warn("Broadcast attempt {} failed for room {}, retrying in {}ms",
-            attempt, roomId, backoff);
+            attempt, msg.getRoomId(), backoff);
         try {
           Thread.sleep(backoff);
         } catch (InterruptedException ie) {
