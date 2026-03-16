@@ -128,8 +128,9 @@ public class BatchWriter {
    * Drains up to {@code batchSize} messages from the buffer and writes them to PostgreSQL.
    * Skips the write if the circuit breaker is open, sending the batch to the DLQ instead.
    * Retries on failure with exponential backoff up to {@code maxRetries} attempts.
+   * Package-private for testing.
    */
-  private void drainAndWrite() {
+  void drainAndWrite() {
     List<ChatMessage> batch = new ArrayList<>(batchSize);
     buffer.drainTo(batch, batchSize);
     if (batch.isEmpty()) return;
