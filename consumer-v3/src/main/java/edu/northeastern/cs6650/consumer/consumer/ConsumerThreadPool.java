@@ -3,6 +3,7 @@ package edu.northeastern.cs6650.consumer.consumer;
 import com.rabbitmq.client.Channel;
 import edu.northeastern.cs6650.consumer.config.RabbitMQConfig;
 import edu.northeastern.cs6650.consumer.db.BatchWriter;
+import edu.northeastern.cs6650.consumer.metrics.ConsumerMetrics;
 import edu.northeastern.cs6650.consumer.redis.RedisPublisher;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -48,6 +49,7 @@ public class ConsumerThreadPool {
   private final RabbitMQConfig config;
   private final RedisPublisher redisPublisher;
   private final BatchWriter batchWriter;
+  private final ConsumerMetrics consumerMetrics;
   private ExecutorService executor;
 
   /**
@@ -56,12 +58,14 @@ public class ConsumerThreadPool {
    * @param config          RabbitMQ config providing connection and tuning params
    * @param redisPublisher  publishes messages to Redis Pub/Sub for server fanout
    * @param batchWriter     buffers messages for batch DB persistence
+   * @param consumerMetrics Stage 1 metrics for tracking consumer pipeline performance
    */
   public ConsumerThreadPool(RabbitMQConfig config, RedisPublisher redisPublisher,
-      BatchWriter batchWriter) {
+      BatchWriter batchWriter, ConsumerMetrics consumerMetrics) {
     this.config = config;
     this.redisPublisher = redisPublisher;
     this.batchWriter = batchWriter;
+    this.consumerMetrics = consumerMetrics;
   }
 
   /**
@@ -78,6 +82,7 @@ public class ConsumerThreadPool {
     int totalRooms = RabbitMQConfig.NUM_ROOMS;
 
     executor = Executors.newFixedThreadPool(threadCount);
+    consumerMetrics.setActiveThreadCount(threadCount);
 
     Map<Integer, List<String>> assignments = new HashMap<>();
     for (int roomId = 1; roomId <= totalRooms; roomId++) {
@@ -104,7 +109,8 @@ public class ConsumerThreadPool {
       Channel channel = config.getConnection().createChannel();
       channel.basicQos(config.getPrefetchCount());
 
-      RoomConsumer consumer = new RoomConsumer(channel, assignedQueues, redisPublisher, batchWriter);
+      RoomConsumer consumer = new RoomConsumer(channel, assignedQueues, redisPublisher, batchWriter,
+          consumerMetrics);
       executor.submit(consumer);
 
       log.info("Thread {} assigned queues: {}", i, assignedQueues);

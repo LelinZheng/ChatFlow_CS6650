@@ -3,6 +3,7 @@ package edu.northeastern.cs6650.consumer.consumer;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Delivery;
 import edu.northeastern.cs6650.consumer.db.BatchWriter;
+import edu.northeastern.cs6650.consumer.metrics.ConsumerMetrics;
 import edu.northeastern.cs6650.consumer.model.ChatMessage;
 import edu.northeastern.cs6650.consumer.redis.RedisPublisher;
 import java.nio.charset.StandardCharsets;
@@ -42,6 +43,7 @@ public class RoomConsumer implements Runnable {
   private final List<String> assignedQueues;
   private final RedisPublisher redisPublisher;
   private final BatchWriter batchWriter;
+  private final ConsumerMetrics consumerMetrics;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
   // duplicate detection: messageId -> time delivered
@@ -54,13 +56,15 @@ public class RoomConsumer implements Runnable {
    * @param assignedQueues  list of queue names this consumer subscribes to (e.g. "room.1")
    * @param redisPublisher  publishes messages to Redis Pub/Sub for server fanout
    * @param batchWriter     buffers messages for batch DB persistence
+   * @param consumerMetrics Stage 1 metrics for tracking consumer pipeline performance
    */
   public RoomConsumer(Channel channel, List<String> assignedQueues,
-      RedisPublisher redisPublisher, BatchWriter batchWriter) {
+      RedisPublisher redisPublisher, BatchWriter batchWriter, ConsumerMetrics consumerMetrics) {
     this.channel = channel;
     this.assignedQueues = assignedQueues;
     this.redisPublisher = redisPublisher;
     this.batchWriter = batchWriter;
+    this.consumerMetrics = consumerMetrics;
   }
 
   /**
@@ -103,18 +107,21 @@ public class RoomConsumer implements Runnable {
    */
   void handleDelivery(Delivery delivery) {
     long deliveryTag = delivery.getEnvelope().getDeliveryTag();
+    long deliveryStart = System.currentTimeMillis();
+    consumerMetrics.incrementReceived();
 
     try {
       ChatMessage msg = objectMapper.readValue(delivery.getBody(), ChatMessage.class);
 
       if (isDuplicate(msg.getMessageId())) {
         log.debug("Duplicate message {} detected, skipping", msg.getMessageId());
+        consumerMetrics.incrementDuplicate();
         channel.basicAck(deliveryTag, false);
         return;
       }
 
       String payload = new String(delivery.getBody(), StandardCharsets.UTF_8);
-      broadcastWithRetry(msg, payload, deliveryTag);
+      broadcastWithRetry(msg, payload, deliveryTag, deliveryStart);
 
     } catch (Exception e) {
       log.error("Failed to process delivery {}: {}", deliveryTag, e.getMessage());
@@ -128,16 +135,20 @@ public class RoomConsumer implements Runnable {
    * Acknowledges to RabbitMQ on success and enqueues the message for DB persistence.
    * Nacks without requeue after all retries exhausted.
    *
-   * @param msg         the deserialized chat message
-   * @param payload     the raw JSON string to send to all server instances
-   * @param deliveryTag RabbitMQ delivery tag used for ack/nack
+   * @param msg           the deserialized chat message
+   * @param payload       the raw JSON string to send to all server instances
+   * @param deliveryTag   RabbitMQ delivery tag used for ack/nack
+   * @param deliveryStart timestamp when delivery arrived, for processing latency
    */
-  private void broadcastWithRetry(ChatMessage msg, String payload, long deliveryTag) {
+  private void broadcastWithRetry(ChatMessage msg, String payload, long deliveryTag,
+      long deliveryStart) {
     int attempt = 0;
     while (attempt < MAX_RETRIES) {
       try {
         redisPublisher.publish(msg.getRoomId(), payload);
         ack(deliveryTag);
+        consumerMetrics.incrementPublished();
+        consumerMetrics.recordProcessing(System.currentTimeMillis() - deliveryStart);
         batchWriter.enqueue(msg);
         return;
       } catch (Exception e) {
@@ -181,6 +192,7 @@ public class RoomConsumer implements Runnable {
    * @param deliveryTag the delivery tag of the message to reject
    */
   private void nack(long deliveryTag) {
+    consumerMetrics.incrementNacked();
     try {
       channel.basicNack(deliveryTag, false, false);
     } catch (Exception e) {
