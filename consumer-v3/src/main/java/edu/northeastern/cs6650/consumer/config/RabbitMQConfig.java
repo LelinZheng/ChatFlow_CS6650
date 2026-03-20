@@ -83,7 +83,7 @@ public class RabbitMQConfig {
    * Queue settings:
    * <ul>
    *   <li>60 second message TTL</li>
-   *   <li>10,000 message max length</li>
+   *   <li>100,000 message max length</li>
    * </ul>
    *
    * @throws Exception if the connection or topology verification fails,
@@ -109,7 +109,7 @@ public class RabbitMQConfig {
 
       Map<String, Object> queueArgs = new HashMap<>();
       queueArgs.put("x-message-ttl", 60000);
-      queueArgs.put("x-max-length", 10000);
+      queueArgs.put("x-max-length", 100000);
 
       for (int i = 1; i <= NUM_ROOMS; i++) {
         String queueName = "room." + i;

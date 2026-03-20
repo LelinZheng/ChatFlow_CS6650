@@ -87,7 +87,7 @@ class RabbitMQConfigTest {
             argThat(args ->
                 args != null &&
                     Integer.valueOf(60000).equals(args.get("x-message-ttl")) &&
-                    Integer.valueOf(10000).equals(args.get("x-max-length"))
+                    Integer.valueOf(100000).equals(args.get("x-max-length"))
             )
         );
       }

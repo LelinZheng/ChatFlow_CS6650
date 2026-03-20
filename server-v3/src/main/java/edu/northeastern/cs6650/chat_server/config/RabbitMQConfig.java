@@ -74,7 +74,7 @@ public class RabbitMQConfig {
 
       Map<String, Object> queueArgs = new HashMap<>();
       queueArgs.put("x-message-ttl", 60000);   // messages expire after 60 seconds
-      queueArgs.put("x-max-length", 10000);     // max 10k messages per queue
+      queueArgs.put("x-max-length", 100000);    // max 100k messages per queue
 
       for (int i = 1; i <= NUM_ROOMS; i++) {
         String queueName = "room." + i;
