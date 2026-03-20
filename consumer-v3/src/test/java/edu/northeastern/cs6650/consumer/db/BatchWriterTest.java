@@ -38,7 +38,7 @@ class BatchWriterTest {
 
     batchWriter = new BatchWriter(mockRepository, mockCircuitBreaker, mockDlq, mockMetrics);
     ReflectionTestUtils.setField(batchWriter, "batchSize", 3);
-    ReflectionTestUtils.setField(batchWriter, "flushIntervalMs", 60000L); // won't fire during tests
+    ReflectionTestUtils.setField(batchWriter, "flushIntervalMs", 60000L);
     ReflectionTestUtils.setField(batchWriter, "writerThreadCount", 1);
     ReflectionTestUtils.setField(batchWriter, "bufferMaxSize", 5);
     ReflectionTestUtils.setField(batchWriter, "maxRetries", 3);
@@ -51,8 +51,9 @@ class BatchWriterTest {
   }
 
   private ChatMessage msg(int i) {
-    return new ChatMessage("msg-" + i, "1", "1", "user1", "hello",
-        "2026-03-16T12:00:00+00:00", "TEXT", "server-1", "127.0.0.1");
+    return new ChatMessage("msg-" + i, "1", "1", "user1",
+        "hello", "2026-03-16T12:00:00+00:00", "TEXT",
+        "server-1", "127.0.0.1");
   }
 
   // ── enqueue ────────────────────────────────────────────────
@@ -68,6 +69,8 @@ class BatchWriterTest {
 
   @Test
   void enqueue_bufferFull_goesToDlq() {
+    // batchSize larger than enqueue count so size-based flush never fires
+    ReflectionTestUtils.setField(batchWriter, "batchSize", 100);
     // bufferMaxSize=5, enqueue 6 — 6th must overflow
     for (int i = 1; i <= 6; i++) batchWriter.enqueue(msg(i));
 

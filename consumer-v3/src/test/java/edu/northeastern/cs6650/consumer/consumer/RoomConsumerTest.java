@@ -34,6 +34,7 @@ class RoomConsumerTest {
   private Channel mockChannel;
   private RedisPublisher mockRedisPublisher;
   private BatchWriter mockBatchWriter;
+  private BroadcastDLQ mockBroadcastDlq;
   private RoomConsumer consumer;
   private ConsumerMetrics consumerMetrics;
 
@@ -56,9 +57,10 @@ class RoomConsumerTest {
     mockChannel = mock(Channel.class);
     mockRedisPublisher = mock(RedisPublisher.class);
     mockBatchWriter = mock(BatchWriter.class);
+    mockBroadcastDlq = mock(BroadcastDLQ.class);
     consumerMetrics = new ConsumerMetrics();
     consumer = new RoomConsumer(mockChannel, List.of("room.5"), mockRedisPublisher, mockBatchWriter,
-        consumerMetrics);
+        mockBroadcastDlq, consumerMetrics);
   }
 
   // ── successful delivery ────────────────────────────────────
@@ -102,10 +104,10 @@ class RoomConsumerTest {
     verify(mockChannel).basicNack(1L, false, false);
   }
 
-  // ── retry + nack on broadcast failure ─────────────────────
+  // ── retry + DLQ handoff on broadcast failure ──────────────
 
   @Test
-  void handleDelivery_broadcastFailsAllRetries_nacks() throws Exception {
+  void handleDelivery_broadcastFailsAllRetries_acksAndSendsToBroadcastDlq() throws Exception {
     doThrow(new RuntimeException("publish failed"))
         .when(mockRedisPublisher).publish(any(), any());
 
@@ -115,8 +117,11 @@ class RoomConsumerTest {
     consumer.handleDelivery(delivery);
 
     verify(mockRedisPublisher, times(3)).publish(any(), any());
-    verify(mockChannel).basicNack(2L, false, false);
-    verify(mockChannel, never()).basicAck(anyLong(), anyBoolean());
+    // acks to take ownership from RabbitMQ — message is NOT lost
+    verify(mockChannel).basicAck(2L, false);
+    verify(mockChannel, never()).basicNack(anyLong(), anyBoolean(), anyBoolean());
+    // hands off to BroadcastDLQ for background retry
+    verify(mockBroadcastDlq).add(any(ChatMessage.class));
   }
 
   @Test

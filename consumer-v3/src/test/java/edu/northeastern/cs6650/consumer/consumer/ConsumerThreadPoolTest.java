@@ -21,6 +21,7 @@ class ConsumerThreadPoolTest {
   private RedisPublisher mockRedisPublisher;
   private Connection mockConnection;
   private BatchWriter mockBatchWriter;
+  private BroadcastDLQ mockBroadcastDlq;
   private ConsumerMetrics consumerMetrics;
 
   @BeforeEach
@@ -29,6 +30,7 @@ class ConsumerThreadPoolTest {
     mockRedisPublisher = mock(RedisPublisher.class);
     mockConnection = mock(Connection.class);
     mockBatchWriter = mock(BatchWriter.class);
+    mockBroadcastDlq = mock(BroadcastDLQ.class);
     consumerMetrics = new ConsumerMetrics();
 
     when(mockConfig.getConnection()).thenReturn(mockConnection);
@@ -42,7 +44,7 @@ class ConsumerThreadPoolTest {
   void init_4threads_distributesWith5RoomsEach() throws Exception {
     when(mockConfig.getConsumerThreadCount()).thenReturn(4);
 
-    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher, mockBatchWriter, consumerMetrics);
+    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher, mockBatchWriter, mockBroadcastDlq, consumerMetrics);
     pool.init();
 
     verify(mockConnection, times(4)).createChannel();
@@ -53,7 +55,7 @@ class ConsumerThreadPoolTest {
   void init_20threads_oneRoomPerThread() throws Exception {
     when(mockConfig.getConsumerThreadCount()).thenReturn(20);
 
-    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher, mockBatchWriter, consumerMetrics);
+    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher, mockBatchWriter, mockBroadcastDlq, consumerMetrics);
     pool.init();
 
     verify(mockConnection, times(20)).createChannel();
@@ -64,7 +66,7 @@ class ConsumerThreadPoolTest {
   void init_40threads_20roomsEachHave2CompetingConsumers() throws Exception {
     when(mockConfig.getConsumerThreadCount()).thenReturn(40);
 
-    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher, mockBatchWriter, consumerMetrics);
+    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher, mockBatchWriter, mockBroadcastDlq, consumerMetrics);
     pool.init();
 
     verify(mockConnection, times(40)).createChannel();
@@ -75,7 +77,7 @@ class ConsumerThreadPoolTest {
   void init_1thread_allRoomsAssignedToSingleThread() throws Exception {
     when(mockConfig.getConsumerThreadCount()).thenReturn(1);
 
-    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher, mockBatchWriter, consumerMetrics);
+    ConsumerThreadPool pool = new ConsumerThreadPool(mockConfig, mockRedisPublisher, mockBatchWriter, mockBroadcastDlq, consumerMetrics);
     pool.init();
 
     verify(mockConnection, times(1)).createChannel();

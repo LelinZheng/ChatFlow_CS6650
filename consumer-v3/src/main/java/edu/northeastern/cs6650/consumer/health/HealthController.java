@@ -1,5 +1,6 @@
 package edu.northeastern.cs6650.consumer.health;
 
+import edu.northeastern.cs6650.consumer.consumer.BroadcastDLQ;
 import edu.northeastern.cs6650.consumer.db.BatchWriter;
 import edu.northeastern.cs6650.consumer.db.DeadLetterQueue;
 import edu.northeastern.cs6650.consumer.metrics.BatchMetrics;
@@ -29,6 +30,7 @@ public class HealthController {
 
   private final BatchMetrics batchMetrics;
   private final ConsumerMetrics consumerMetrics;
+  private final BroadcastDLQ broadcastDlq;
   private final DeadLetterQueue dlq;
   private final BatchWriter batchWriter;
 
@@ -37,13 +39,15 @@ public class HealthController {
    *
    * @param batchMetrics    counters for Stage 2 DB write throughput and latency
    * @param consumerMetrics counters for Stage 1 consumer pipeline performance
-   * @param dlq             dead letter queue for dropped messages
+   * @param broadcastDlq    retry queue for Stage 1 broadcast failures
+   * @param dlq             dead letter queue for Stage 2 DB write failures
    * @param batchWriter     shared message buffer
    */
   public HealthController(BatchMetrics batchMetrics, ConsumerMetrics consumerMetrics,
-      DeadLetterQueue dlq, BatchWriter batchWriter) {
+      BroadcastDLQ broadcastDlq, DeadLetterQueue dlq, BatchWriter batchWriter) {
     this.batchMetrics = batchMetrics;
     this.consumerMetrics = consumerMetrics;
+    this.broadcastDlq = broadcastDlq;
     this.dlq = dlq;
     this.batchWriter = batchWriter;
   }
@@ -80,6 +84,7 @@ public class HealthController {
     response.put("consumer.avgProcessingLatencyMs", consumerMetrics.getAvgProcessingLatencyMs());
     response.put("consumer.nackCount", consumerMetrics.getNackCount());
     response.put("consumer.duplicateCount", consumerMetrics.getDuplicateCount());
+    response.put("consumer.broadcastDlqSize", broadcastDlq.size());
 
     // Stage 2: batch DB writer (buffer → PostgreSQL)
     response.put("db.bufferSize", batchWriter.bufferSize());

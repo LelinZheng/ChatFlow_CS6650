@@ -49,6 +49,7 @@ public class ConsumerThreadPool {
   private final RabbitMQConfig config;
   private final RedisPublisher redisPublisher;
   private final BatchWriter batchWriter;
+  private final BroadcastDLQ broadcastDlq;
   private final ConsumerMetrics consumerMetrics;
   private ExecutorService executor;
 
@@ -58,13 +59,15 @@ public class ConsumerThreadPool {
    * @param config          RabbitMQ config providing connection and tuning params
    * @param redisPublisher  publishes messages to Redis Pub/Sub for server fanout
    * @param batchWriter     buffers messages for batch DB persistence
+   * @param broadcastDlq    retry queue for messages that fail all inline broadcast attempts
    * @param consumerMetrics Stage 1 metrics for tracking consumer pipeline performance
    */
   public ConsumerThreadPool(RabbitMQConfig config, RedisPublisher redisPublisher,
-      BatchWriter batchWriter, ConsumerMetrics consumerMetrics) {
+      BatchWriter batchWriter, BroadcastDLQ broadcastDlq, ConsumerMetrics consumerMetrics) {
     this.config = config;
     this.redisPublisher = redisPublisher;
     this.batchWriter = batchWriter;
+    this.broadcastDlq = broadcastDlq;
     this.consumerMetrics = consumerMetrics;
   }
 
@@ -110,7 +113,7 @@ public class ConsumerThreadPool {
       channel.basicQos(config.getPrefetchCount());
 
       RoomConsumer consumer = new RoomConsumer(channel, assignedQueues, redisPublisher, batchWriter,
-          consumerMetrics);
+          broadcastDlq, consumerMetrics);
       executor.submit(consumer);
 
       log.info("Thread {} assigned queues: {}", i, assignedQueues);

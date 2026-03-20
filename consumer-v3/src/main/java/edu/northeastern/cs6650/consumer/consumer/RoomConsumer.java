@@ -43,6 +43,7 @@ public class RoomConsumer implements Runnable {
   private final List<String> assignedQueues;
   private final RedisPublisher redisPublisher;
   private final BatchWriter batchWriter;
+  private final BroadcastDLQ broadcastDlq;
   private final ConsumerMetrics consumerMetrics;
   private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -56,14 +57,17 @@ public class RoomConsumer implements Runnable {
    * @param assignedQueues  list of queue names this consumer subscribes to (e.g. "room.1")
    * @param redisPublisher  publishes messages to Redis Pub/Sub for server fanout
    * @param batchWriter     buffers messages for batch DB persistence
+   * @param broadcastDlq    retry queue for messages that fail all inline broadcast attempts
    * @param consumerMetrics Stage 1 metrics for tracking consumer pipeline performance
    */
   public RoomConsumer(Channel channel, List<String> assignedQueues,
-      RedisPublisher redisPublisher, BatchWriter batchWriter, ConsumerMetrics consumerMetrics) {
+      RedisPublisher redisPublisher, BatchWriter batchWriter,
+      BroadcastDLQ broadcastDlq, ConsumerMetrics consumerMetrics) {
     this.channel = channel;
     this.assignedQueues = assignedQueues;
     this.redisPublisher = redisPublisher;
     this.batchWriter = batchWriter;
+    this.broadcastDlq = broadcastDlq;
     this.consumerMetrics = consumerMetrics;
   }
 
@@ -133,7 +137,9 @@ public class RoomConsumer implements Runnable {
    * Publishes a message to the Redis channel for the message's room via {@link RedisPublisher},
    * retrying up to {@link #MAX_RETRIES} times with exponential backoff on failure.
    * Acknowledges to RabbitMQ on success and enqueues the message for DB persistence.
-   * Nacks without requeue after all retries exhausted.
+   * If all inline retries are exhausted, acks the delivery (taking ownership from RabbitMQ)
+   * and deposits the message in the {@link BroadcastDLQ} for background retry, preserving
+   * at-least-once delivery instead of dropping the message via nack.
    *
    * @param msg           the deserialized chat message
    * @param payload       the raw JSON string to send to all server instances
@@ -154,8 +160,10 @@ public class RoomConsumer implements Runnable {
       } catch (Exception e) {
         attempt++;
         if (attempt == MAX_RETRIES) {
-          log.error("Broadcast to room {} failed after {} attempts", msg.getRoomId(), MAX_RETRIES);
-          nack(deliveryTag);
+          log.error("Broadcast to room {} failed after {} attempts, handing off to BroadcastDLQ",
+              msg.getRoomId(), MAX_RETRIES);
+          ack(deliveryTag);
+          broadcastDlq.add(msg);
           return;
         }
         long backoff = BASE_BACKOFF_MS * (1L << attempt); // 200ms, 400ms, 800ms
@@ -165,7 +173,8 @@ public class RoomConsumer implements Runnable {
           Thread.sleep(backoff);
         } catch (InterruptedException ie) {
           Thread.currentThread().interrupt();
-          nack(deliveryTag);
+          ack(deliveryTag);
+          broadcastDlq.add(msg);
           return;
         }
       }
