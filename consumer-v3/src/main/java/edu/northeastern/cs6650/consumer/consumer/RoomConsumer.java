@@ -154,7 +154,12 @@ public class RoomConsumer implements Runnable {
         redisPublisher.publish(msg.getRoomId(), payload);
         ack(deliveryTag);
         consumerMetrics.incrementPublished();
-        consumerMetrics.recordProcessing(System.currentTimeMillis() - deliveryStart);
+        long processingMs = System.currentTimeMillis() - deliveryStart;
+        consumerMetrics.recordProcessing(processingMs);
+        if (processingMs > 2000) {
+          log.warn("Slow message processing: {}ms for messageId={} room={}",
+              processingMs, msg.getMessageId(), msg.getRoomId());
+        }
         batchWriter.enqueue(msg);
         return;
       } catch (Exception e) {

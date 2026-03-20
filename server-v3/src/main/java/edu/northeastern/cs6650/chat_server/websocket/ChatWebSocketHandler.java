@@ -76,7 +76,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
    * @param session the newly established WebSocket session
    */
   public void afterConnectionEstablished(WebSocketSession session) {
-    log.info("WebSocket connection established: {}", session.getId());
   }
 
   /**
@@ -104,7 +103,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
           "INVALID_JSON",
           "Malformed JSON payload",
           List.of(e.getMessage()));
-      session.sendMessage(new TextMessage(objectMapper.writeValueAsString(err)));
+      synchronized (session) { session.sendMessage(new TextMessage(objectMapper.writeValueAsString(err))); }
       return;
     }
 
@@ -115,7 +114,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
           "VALIDATION_FAILED",
           "Message validation failed",
           errors);
-      session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse)));
+      synchronized (session) { session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse))); }
       return;
     }
 
@@ -135,7 +134,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
           "SERVICE_UNAVAILABLE",
           "Message queue is currently unavailable, please try again later",
           List.of());
-      session.sendMessage(new TextMessage(objectMapper.writeValueAsString(circuitErr)));
+      synchronized (session) { session.sendMessage(new TextMessage(objectMapper.writeValueAsString(circuitErr))); }
       return;
     }
 
@@ -195,7 +194,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
   @Override
   public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
     roomManager.removeSession(session);
-    log.info("WebSocket connection closed: {}", session.getId());
+    if (!status.equalsCode(CloseStatus.NORMAL) && !status.equalsCode(CloseStatus.GOING_AWAY)) {
+      log.warn("WebSocket session {} closed unexpectedly: {}", session.getId(), status);
+    }
   }
 
 }

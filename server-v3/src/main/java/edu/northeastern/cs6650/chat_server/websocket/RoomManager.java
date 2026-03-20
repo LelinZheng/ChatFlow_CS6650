@@ -49,7 +49,7 @@ public class RoomManager {
       Set<WebSocketSession> currentSessions = roomSessions.get(currentRoom);
       if (currentSessions != null) {
         currentSessions.remove(session);
-        log.info("Session {} auto-left room {} to join room {}", session.getId(), currentRoom, roomId);
+  
       }
     }
 
@@ -57,8 +57,6 @@ public class RoomManager {
         .computeIfAbsent(roomId, k -> ConcurrentHashMap.newKeySet())
         .add(session);
     sessionRoomMap.put(session.getId(), roomId);
-    log.info("Session {} joined room {} — room now has {} sessions",
-        session.getId(), roomId, roomSessions.get(roomId).size());
   }
 
   /**
@@ -73,8 +71,6 @@ public class RoomManager {
       Set<WebSocketSession> sessions = roomSessions.get(roomId);
       if (sessions != null) {
         sessions.remove(session);
-        log.info("Session {} left room {} — room now has {} sessions",
-            session.getId(), roomId, sessions.size());
       }
     }
   }
@@ -103,7 +99,9 @@ public class RoomManager {
         continue;
       }
       try {
-        session.sendMessage(message);
+        synchronized (session) {
+          session.sendMessage(message);
+        }
       } catch (Exception e) {
         log.warn("Failed to send to session {} in room {}: {}",
             session.getId(), roomId, e.getMessage());
@@ -115,7 +113,7 @@ public class RoomManager {
     if (!dead.isEmpty()) {
       sessions.removeAll(dead);
       dead.forEach(s -> sessionRoomMap.remove(s.getId()));
-      log.info("Removed {} dead sessions from room {}", dead.size(), roomId);
+      log.warn("Removed {} dead sessions from room {}", dead.size(), roomId);
     }
   }
 
