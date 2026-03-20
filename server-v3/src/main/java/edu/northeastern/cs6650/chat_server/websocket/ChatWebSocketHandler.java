@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -142,7 +141,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     // Build queue message and publish for all types (JOIN/LEAVE carry broadcast text too)
     QueueMessage queueMsg = new QueueMessage(
-        UUID.randomUUID().toString(),
+        clientMessage.getMessageId(),
         clientMessage.getRoomId(),
         clientMessage.getUserId(),
         clientMessage.getUsername(),

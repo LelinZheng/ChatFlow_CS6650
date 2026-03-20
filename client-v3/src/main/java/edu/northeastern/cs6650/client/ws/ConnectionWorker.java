@@ -49,6 +49,7 @@ public class ConnectionWorker implements Runnable {
 
   private final AtomicLong latencySumNanos = new AtomicLong(0);
   private volatile WebSocketClient client;
+  private volatile String expectedMessageId;
 
   private final int maxRetries;
   private final long echoTimeoutMs;
@@ -99,7 +100,10 @@ public class ConnectionWorker implements Runnable {
 
       @Override
       public void onMessage(String message) {
-        echoMailbox.offer(message);
+        String expected = expectedMessageId;
+        if (expected != null && message.contains(expected)) {
+          echoMailbox.offer(message);
+        }
       }
 
       @Override
@@ -370,7 +374,15 @@ public class ConnectionWorker implements Runnable {
   private boolean sendWaitEchoWithRetries(ChatMessage message) throws InterruptedException {
     long backoffMs = 50;
 
+    try {
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      // On retry, generate a fresh ID so the server deduplicator doesn't silently
+      // drop the resent message. At-least-once delivery is acceptable here.
+      if (attempt > 1) {
+        message.setMessageId(java.util.UUID.randomUUID().toString());
+      }
+      expectedMessageId = message.getMessageId();
+
       long t0 = System.nanoTime();
       long sendTsMillis = System.currentTimeMillis();
       try {
@@ -424,6 +436,9 @@ public class ConnectionWorker implements Runnable {
       Thread.currentThread().interrupt();
     }
     return false;
+    } finally {
+      expectedMessageId = null;
+    }
   }
 
   /**
