@@ -36,7 +36,7 @@ public class MetricsRepository {
    * @return ordered list of message rows
    */
   public List<Map<String, Object>> roomMessagesInTimeRange(
-      String roomId, String startTime, String endTime) {
+      String roomId, String startTime, String endTime, int sampleSize) {
     return jdbc.queryForList("""
         SELECT message_id, room_id, user_id, username,
                content, message_type, created_at
@@ -44,8 +44,8 @@ public class MetricsRepository {
         WHERE room_id = ?
           AND created_at BETWEEN ?::timestamptz AND ?::timestamptz
         ORDER BY created_at ASC
-        LIMIT 1000
-        """, roomId, startTime, endTime);
+        LIMIT ?
+        """, roomId, startTime, endTime, sampleSize);
   }
 
   /**
@@ -56,7 +56,7 @@ public class MetricsRepository {
    * @return list of message rows capped at 500
    */
   public List<Map<String, Object>> userMessageHistory(
-      String userId, String startTime, String endTime) {
+      String userId, String startTime, String endTime, int sampleSize) {
     return jdbc.queryForList("""
         SELECT message_id, room_id, user_id, username,
                content, message_type, created_at
@@ -65,8 +65,8 @@ public class MetricsRepository {
           AND (? IS NULL OR created_at >= ?::timestamptz)
           AND (? IS NULL OR created_at <= ?::timestamptz)
         ORDER BY created_at DESC
-        LIMIT 500
-        """, userId, startTime, startTime, endTime, endTime);
+        LIMIT ?
+        """, userId, startTime, startTime, endTime, endTime, sampleSize);
   }
 
   /**

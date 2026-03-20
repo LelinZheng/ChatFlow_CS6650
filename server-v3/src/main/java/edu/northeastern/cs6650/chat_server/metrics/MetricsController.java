@@ -50,7 +50,8 @@ public class MetricsController {
       @RequestParam(required = false) String userId,
       @RequestParam(required = false) String startTime,
       @RequestParam(required = false) String endTime,
-      @RequestParam(defaultValue = "10") int topN) {
+      @RequestParam(defaultValue = "10") int topN,
+      @RequestParam(defaultValue = "10") int sampleSize) {
 
     // Resolve defaults from data if params not supplied
     String resolvedRoomId    = roomId    != null ? roomId    : repo.mostActiveRoomId();
@@ -72,9 +73,9 @@ public class MetricsController {
     // Core queries
     Map<String, Object> core = new LinkedHashMap<>();
     core.put("roomMessagesInTimeRange",
-        repo.roomMessagesInTimeRange(resolvedRoomId, resolvedStartTime, resolvedEndTime));
+        repo.roomMessagesInTimeRange(resolvedRoomId, resolvedStartTime, resolvedEndTime, sampleSize));
     core.put("userMessageHistory",
-        repo.userMessageHistory(resolvedUserId, resolvedStartTime, resolvedEndTime));
+        repo.userMessageHistory(resolvedUserId, resolvedStartTime, resolvedEndTime, sampleSize));
     core.put("activeUserCount",
         repo.activeUserCount(resolvedStartTime, resolvedEndTime));
     core.put("userRoomsParticipated",
