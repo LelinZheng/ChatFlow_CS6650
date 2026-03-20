@@ -1,6 +1,8 @@
 package edu.northeastern.cs6650.client;
-import edu.northeastern.cs6650.client.loadtest.LoadTestRunner;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.northeastern.cs6650.client.loadtest.LoadTestRunner;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -20,6 +22,10 @@ import java.time.Duration;
  */
 public class LoadTestClient {
 
+  private static final int POLL_INTERVAL_MS = 5_000;
+  private static final int STABLE_ROUNDS_REQUIRED = 3; // received must not change for 3 polls (15s)
+  private static final int MAX_WAIT_MINUTES = 10;
+
   /**
    * Executes the complete load test workflow.
    *
@@ -30,13 +36,12 @@ public class LoadTestClient {
    */
   public static void main(String[] args) {
     System.out.println("Load Test Client Started");
-//    String httpBaseUrl = "http://localhost:8080";
-//    URI wsBaseUri = URI.create("ws://localhost:8080/chat");
-    String httpBaseUrl = "http://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com";
-    URI wsBaseUri = URI.create("ws://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com/chat");
+    String serverUrl   = "http://localhost:8080";
+    String consumerUrl = "http://localhost:8081";
+    URI wsBaseUri = URI.create("ws://localhost:8080/chat");
 
     System.out.println("Performing server health check...");
-    if (!checkServerHealth(httpBaseUrl)) {
+    if (!checkServerHealth(serverUrl)) {
       System.err.println("Server is not healthy. Aborting load test.");
       System.exit(1);
     }
@@ -46,26 +51,133 @@ public class LoadTestClient {
     runner.runLoadTest();
     runner.printSummary();
 
-    System.out.println("\nFetching server metrics...");
-    fetchAndLogMetrics(httpBaseUrl);
+    System.out.println("\nWaiting for consumer to fully drain (RabbitMQ queue + DB buffer)...");
+    waitForConsumerDrain(consumerUrl);
+
+    System.out.println("Fetching consumer DB stats...");
+    fetchAndLogConsumerStats(consumerUrl, runner.getSummaryPath());
+
+    System.out.println("Fetching server metrics...");
+    fetchAndLogMetrics(serverUrl);
   }
 
   /**
-   * Performs a health check against the server before starting the load test.
+   * Polls GET /health/stats on consumer-v3 every 5 seconds until:
+   * - db.bufferSize == 0 (BatchWriter has flushed everything to PostgreSQL)
+   * - consumer.received has been stable for 3 consecutive polls (RabbitMQ queue drained)
    *
-   * <p>This method sends an HTTP GET request to the server's /health endpoint
-   * to verify that the server is reachable and operational before initiating the WebSocket load
-   * test.</p>
+   * <p>Gives up after {@link #MAX_WAIT_MINUTES} minutes and proceeds anyway.
    *
-   * @param baseUrl the base HTTP URL of the server (e.g., "http://host:port")
-   * @return {@code true} if the server responds with HTTP 200; {@code false} otherwise
+   * @param consumerUrl base URL of consumer-v3 (e.g. "http://localhost:8081")
    */
+  private static void waitForConsumerDrain(String consumerUrl) {
+    HttpClient client = HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(5))
+        .build();
+    ObjectMapper mapper = new ObjectMapper();
+
+    long deadline = System.currentTimeMillis() + MAX_WAIT_MINUTES * 60_000L;
+    long lastReceived = -1;
+    int stableRounds = 0;
+
+    while (System.currentTimeMillis() < deadline) {
+      try {
+        Thread.sleep(POLL_INTERVAL_MS);
+
+        HttpRequest req = HttpRequest.newBuilder()
+            .uri(URI.create(consumerUrl + "/health/stats"))
+            .GET()
+            .timeout(Duration.ofSeconds(5))
+            .build();
+
+        HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
+        if (resp.statusCode() != 200) {
+          System.err.println("Consumer stats returned " + resp.statusCode() + ", retrying...");
+          continue;
+        }
+
+        JsonNode stats = mapper.readTree(resp.body());
+        long bufferSize  = stats.path("db.bufferSize").asLong(-1);
+        long received    = stats.path("consumer.received").asLong(-1);
+        long dlqSize     = stats.path("consumer.broadcastDlqSize").asLong(0);
+
+        System.out.printf("  consumer.received=%d  db.bufferSize=%d  broadcastDlqSize=%d%n",
+            received, bufferSize, dlqSize);
+
+        if (received == lastReceived) {
+          stableRounds++;
+        } else {
+          stableRounds = 0;
+          lastReceived = received;
+        }
+
+        if (bufferSize == 0 && stableRounds >= STABLE_ROUNDS_REQUIRED) {
+          System.out.println("Consumer fully drained. Proceeding to metrics.");
+          return;
+        }
+
+      } catch (IOException | InterruptedException e) {
+        System.err.println("Poll failed: " + e.getMessage() + ", retrying...");
+      }
+    }
+
+    System.err.println("WARNING: consumer did not fully drain within " + MAX_WAIT_MINUTES
+        + " minutes. Fetching metrics anyway — counts may be incomplete.");
+  }
+
   /**
-   * Calls GET /api/metrics on server-v3 after the load test completes and logs the result.
-   * Uses no query params so the server auto-resolves the most active room/user and full
-   * time range as sample inputs.
+   * Fetches final DB write stats from consumer-v3 and appends them to the summary file.
    *
-   * @param baseUrl the base HTTP URL of the server (e.g., "http://host:port")
+   * @param consumerUrl base URL of consumer-v3 (e.g. "http://localhost:8081")
+   * @param summaryPath path to the summary file to append to
+   */
+  private static void fetchAndLogConsumerStats(String consumerUrl, java.nio.file.Path summaryPath) {
+    try {
+      HttpClient client = HttpClient.newBuilder()
+          .connectTimeout(Duration.ofSeconds(10))
+          .build();
+      HttpRequest request = HttpRequest.newBuilder()
+          .uri(URI.create(consumerUrl + "/health/stats"))
+          .GET()
+          .timeout(Duration.ofSeconds(10))
+          .build();
+
+      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      if (response.statusCode() != 200) {
+        System.err.println("Consumer stats returned " + response.statusCode());
+        return;
+      }
+
+      ObjectMapper mapper = new ObjectMapper();
+      JsonNode stats = mapper.readTree(response.body());
+
+      StringBuilder sb = new StringBuilder();
+      sb.append("\n=== Consumer DB Stats ===\n");
+      sb.append("consumer.received=").append(stats.path("consumer.received").asLong()).append("\n");
+      sb.append("consumer.avgProcessingLatencyMs=")
+          .append(stats.path("consumer.avgProcessingLatencyMs").asLong()).append("\n");
+      sb.append("db.written=").append(stats.path("db.written").asLong()).append("\n");
+      sb.append("db.dropped=").append(stats.path("db.dropped").asLong()).append("\n");
+      sb.append("db.flushCount=").append(stats.path("db.flushCount").asLong()).append("\n");
+      sb.append("db.avgFlushLatencyMs=")
+          .append(stats.path("db.avgFlushLatencyMs").asLong()).append("\n");
+      sb.append("db.writtenPerSec=").append(stats.path("db.writtenPerSec").asLong()).append("\n");
+
+      System.out.print(sb);
+
+      java.nio.file.Files.writeString(summaryPath, sb.toString(),
+          java.nio.file.StandardOpenOption.APPEND);
+
+    } catch (IOException | InterruptedException e) {
+      System.err.println("Failed to fetch consumer stats: " + e.getMessage());
+    }
+  }
+
+  /**
+   * Calls GET /api/metrics on server-v3 after the consumer has drained and logs the result.
+   * Uses sampleSize=10 to limit the per-message list fields to 10 rows each.
+   *
+   * @param baseUrl the base HTTP URL of server-v3 (e.g., "http://host:port")
    */
   private static void fetchAndLogMetrics(String baseUrl) {
     try {
@@ -74,7 +186,7 @@ public class LoadTestClient {
           .build();
 
       HttpRequest request = HttpRequest.newBuilder()
-          .uri(URI.create(baseUrl + "/api/metrics"))
+          .uri(URI.create(baseUrl + "/api/metrics?sampleSize=10"))
           .GET()
           .timeout(Duration.ofSeconds(30))
           .build();
@@ -93,6 +205,12 @@ public class LoadTestClient {
     }
   }
 
+  /**
+   * Performs a health check against the server before starting the load test.
+   *
+   * @param baseUrl the base HTTP URL of the server (e.g., "http://host:port")
+   * @return {@code true} if the server responds with HTTP 200; {@code false} otherwise
+   */
   private static boolean checkServerHealth(String baseUrl) {
     try {
       HttpClient client = HttpClient.newBuilder()
@@ -118,6 +236,5 @@ public class LoadTestClient {
       System.err.println("✗ Server health check failed: " + e.getMessage());
       return false;
     }
-
   }
 }

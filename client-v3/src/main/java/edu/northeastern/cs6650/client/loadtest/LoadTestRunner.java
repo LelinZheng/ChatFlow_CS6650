@@ -92,7 +92,7 @@ public class LoadTestRunner {
     BlockingQueue<ChatMessage> sharedQueue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
     List<ConnectionWorker> workers = new ArrayList<>(TOTAL_WORKERS);
     BlockingQueue<MetricRecord> metricsQueue = new ArrayBlockingQueue<>(50_000);
-    Path outDir = Paths.get("..", "results/v2");
+    Path outDir = Paths.get("..", "results/v3");
 
     // Start metrics writer — file labeled with worker count so runs don't overwrite each other
     Path mainCsvPath = outDir.resolve("main_metrics_" + runLabel + ".csv");
@@ -195,11 +195,19 @@ public class LoadTestRunner {
   }
 
   /**
+   * Returns the path to the summary file for this run.
+   * @return path to summary_{runLabel}.txt
+   */
+  public Path getSummaryPath() {
+    return Paths.get("..", "results/v3").resolve("summary_" + runLabel + ".txt");
+  }
+
+  /**
    * Prints a summary of load test results by reading and analyzing the CSV metrics file.
    */
   public void printSummary() {
     System.out.println("\nLoad test summary:");
-    Path outDir = Paths.get("..", "results/v2");
+    Path outDir = Paths.get("..", "results/v3");
     Path metricsCsv = outDir.resolve("main_metrics_" + runLabel + ".csv");
     Path bucketsCsv = outDir.resolve("throughput_10s_" + runLabel + ".csv");
     Path summaryPath = outDir.resolve("summary_" + runLabel + ".txt");
