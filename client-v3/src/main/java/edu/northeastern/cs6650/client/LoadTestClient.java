@@ -107,7 +107,7 @@ public class LoadTestClient {
         if (received == lastReceived) {
           stableRounds++;
         } else {
-          stableRounds = 0;
+          stableRounds = 1;
           lastReceived = received;
         }
 
