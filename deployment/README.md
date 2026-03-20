@@ -174,7 +174,7 @@ Each component runs on its own dedicated EC2 instance. RabbitMQ and Redis are ea
 | Protocol | HTTP (WebSocket upgrade supported) |
 | Target group protocol | HTTP |
 | Health check path | `GET /health` |
-| Session stickiness | Disabled |
+
 
 ### Adding / Removing Server Instances
 1. Launch a new `t3.micro` EC2 instance
