@@ -109,7 +109,7 @@ Each component runs on its own dedicated EC2 instance. RabbitMQ and Redis are ea
                ┌─────────────────┼─────────────────┐
                ▼                 ▼                 ▼
         ┌──────────┐      ┌──────────┐      ┌──────────┐
-        │Server-v2 │      │Server-v2 │  …  │Server-v2 │
+        │Server-v3 │      │Server-v3 │  …   │Server-v3 │
         │t3.micro  │      │t3.micro  │      │t3.micro  │
         │port 8080 │      │port 8080 │      │port 8080 │
         └────┬─────┘      └────┬─────┘      └────┬─────┘
@@ -145,7 +145,7 @@ Each component runs on its own dedicated EC2 instance. RabbitMQ and Redis are ea
                ┌─────────────┼─────────────────┐
                ▼             ▼                 ▼
         ┌──────────┐  ┌──────────┐      ┌──────────┐
-        │Server-v2 │  │Server-v2 │  …  │Server-v2 │
+        │Server-v3 │  │Server-v3 │  …  │Server-v3 │
         │broadcast │  │broadcast │      │broadcast │
         └──────────┘  └──────────┘      └──────────┘
 ```
@@ -156,7 +156,7 @@ Each component runs on its own dedicated EC2 instance. RabbitMQ and Redis are ea
 
 | Component | Instance Type | Count | Notes |
 |---|---|---|---|
-| Server-v2 | t3.micro | 1 / 2 / 4 | Behind ALB |
+| Server-v3 | t3.micro | 1 / 2 / 4 | Behind ALB |
 | Consumer-v3 | t3.micro | 1 | Fixed single instance |
 | RabbitMQ | t3.micro | 1 | Docker, dedicated instance |
 | Redis | t3.micro | 1 | Docker, dedicated instance |
@@ -178,39 +178,42 @@ Each component runs on its own dedicated EC2 instance. RabbitMQ and Redis are ea
 
 ### Adding / Removing Server Instances
 1. Launch a new `t3.micro` EC2 instance
-2. Deploy server-v2 JAR and start the `systemd` service
+2. Deploy server-v3 JAR and start the `systemd` service
 3. Register the instance in the ALB target group
 4. ALB health check confirms the instance is healthy before routing traffic
 
 ---
 
-## Deploying server-v2 to EC2
+## Deploying server-v3 to EC2
 
 ```bash
 # Build locally
-cd server-v2
+cd server-v3
 mvn clean package -DskipTests
 
 # Copy JAR to EC2
-scp -i ../Chat_Key.pem target/chat-server-v2.jar \
+scp -i ../Chat_Key.pem target/chat-server-v3.jar \
     ec2-user@<EC2_HOST>:~/
 
 # SSH in and set up systemd service
 ssh -i ../Chat_Key.pem ec2-user@<EC2_HOST>
 
-sudo nano /etc/systemd/system/server-v2.service
+sudo nano /etc/systemd/system/server-v3.service
 ```
 
-Example `server-v2.service`:
+Example `server-v3.service`:
 ```ini
 [Unit]
-Description=ChatFlow Server v2
+Description=ChatFlow Server v3
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/java -jar /home/ec2-user/chat-server-v2.jar \
+ExecStart=/usr/bin/java -jar /home/ec2-user/chat-server-v3.jar \
   --rabbitmq.host=<RABBITMQ_HOST> \
-  --spring.data.redis.host=<REDIS_HOST>
+  --spring.data.redis.host=<REDIS_HOST> \
+  --spring.datasource.url=jdbc:postgresql://<RDS_HOST>:5432/chatflow \
+  --spring.datasource.username=chatflow \
+  --spring.datasource.password=<DB_PASSWORD>
 Restart=always
 User=ec2-user
 
@@ -220,18 +223,18 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable server-v2
-sudo systemctl start server-v2
-sudo systemctl status server-v2
+sudo systemctl enable server-v3
+sudo systemctl start server-v3
+sudo systemctl status server-v3
 ```
 
 ---
 
-## Deploying consumer to EC2
+## Deploying consumer-v3 to EC2
 
 ```bash
 # Build locally
-cd consumer
+cd consumer-v3
 mvn clean package -DskipTests
 
 # Copy JAR to EC2
@@ -242,15 +245,20 @@ scp -i ../Chat_Key.pem target/consumer.jar \
 Example `consumer.service` (change `consumer.thread.count` to tune):
 ```ini
 [Unit]
-Description=ChatFlow Consumer
+Description=ChatFlow Consumer v3
 After=network.target
 
 [Service]
 ExecStart=/usr/bin/java -jar /home/ec2-user/consumer.jar \
   --rabbitmq.host=<RABBITMQ_HOST> \
   --spring.data.redis.host=<REDIS_HOST> \
+  --spring.datasource.url=jdbc:postgresql://<RDS_HOST>:5432/chatflow \
+  --spring.datasource.username=chatflow \
+  --spring.datasource.password=<DB_PASSWORD> \
   --consumer.thread.count=20 \
-  --consumer.prefetch.count=10
+  --consumer.prefetch.count=10 \
+  --batch.writer.batch.size=500 \
+  --batch.writer.flush.interval.ms=500
 Restart=always
 User=ec2-user
 
@@ -270,8 +278,8 @@ sudo systemctl restart consumer
 ## Related Documentation
 
 - [Main Project README](../README.md)
-- [Server v2](../server-v2/README.md)
-- [Consumer](../consumer/README.md)
+- [Server v3](../server-v3/README.md)
+- [Consumer v3](../consumer-v3/README.md)
 - [Architecture Document](../doc/architecture.md)
 
 ---

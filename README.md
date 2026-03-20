@@ -1,6 +1,6 @@
 # ChatFlow – CS6650 Scalable Distributed Systems
 
-This repository contains the implementation for **CS6650 Assignments 1 & 2**, building a **WebSocket-based distributed chat system** with progressively more advanced infrastructure across assignments.
+This repository contains the implementation for **CS6650 Assignments 1, 2 & 3**, building a **WebSocket-based distributed chat system** with progressively more advanced infrastructure across assignments.
 
 ---
 
@@ -111,6 +111,74 @@ Region: `us-west-2`
 
 ---
 
+## Assignment 3 – Database Persistence & Analytics
+
+Extends the system with persistent message storage in PostgreSQL and a REST analytics API for querying the stored data.
+
+### Scope
+- Asynchronous batch persistence of all messages to PostgreSQL (consumer-side `BatchWriter`)
+- Broadcast Dead Letter Queue for at-least-once delivery guarantees
+- Per-pipeline consumer metrics (received, published, nacked, duplicates, processing latency, DB write stats)
+- REST analytics API on server-v3 querying the persisted messages
+- Post-load-test drain polling and stats collection in the load test client
+- RabbitMQ queue capacity increased to 100k messages per queue to handle higher throughput
+
+### Architecture
+
+```
+Client-v3 (load test)
+    │ WebSocket /chat
+    ▼
+AWS ALB (port 80)
+    │
+    ├── Server-v3 #1 ──┐
+    ├── Server-v3 #2 ──┤── publish ──► RabbitMQ (chat.exchange, 20 queues, cap=100k)
+    └── Server-v3 #N ──┘                    │
+         ▲                                  ▼ consume
+         │                           Consumer-v3 (thread pool)
+         │ subscribe                         │
+         │                          ┌────────┴────────┐
+         │                          ▼                 ▼
+         │                    Redis Pub/Sub      BatchWriter
+         │                          │                 │ batch flush
+         └──────────────────────────┘                 ▼
+                                                 PostgreSQL
+                                                      │
+                                              GET /api/metrics
+                                                      ▼
+                                                 Server-v3
+```
+
+### Subprojects
+
+#### `/server-v3`
+Extended WebSocket server. Adds a `GET /api/metrics` analytics endpoint backed by PostgreSQL. All `session.sendMessage()` calls are synchronized to prevent concurrent write exceptions.
+
+📖 See [`server-v3/README.md`](server-v3/README.md)
+
+#### `/consumer-v3`
+Extended consumer service. Adds asynchronous batch DB writes (`BatchWriter`), a `BroadcastDLQ` for failed broadcasts, per-pipeline metrics (`ConsumerMetrics`, `BatchMetrics`), and a `GET /health/stats` endpoint.
+
+📖 See [`consumer-v3/README.md`](consumer-v3/README.md)
+
+#### `/client-v3`
+Extended load test client. Adds correct echo matching by `messageId`, post-test drain polling on `GET /health/stats`, consumer DB stats collection, and server analytics fetch via `GET /api/metrics`.
+
+📖 See [`client-v3/README.md`](client-v3/README.md)
+
+### Deployment
+| Component | Instance Type | Count | Notes |
+|---|---|---|---|
+| Server-v3 | t3.micro | 1 / 2 / 4 | Behind ALB |
+| Consumer-v3 | t3.micro | 1 | Fixed single instance |
+| RabbitMQ | t3.micro | 1 | Docker, dedicated instance |
+| Redis | t3.micro | 1 | Docker, dedicated instance |
+| PostgreSQL | RDS db.t3.micro | 1 | AWS managed |
+
+Region: `us-west-2`
+
+---
+
 ## Repository Structure
 
 ```
@@ -125,11 +193,17 @@ ChatFlow_CS6650/
 ├── server-v2/               # Assignment 2 — distributed WebSocket server
 ├── consumer/                # Assignment 2 — RabbitMQ consumer service
 ├── client-v2/               # Assignment 2 — redesigned load test client
-├── deployment/              # Assignment 2 — Docker Compose, EC2 setup, ALB
-├── monitoring/              # Assignment 2 — graph generation scripts
+│
+├── server-v3/               # Assignment 3 — server with analytics API
+├── consumer-v3/             # Assignment 3 — consumer with DB persistence
+├── client-v3/               # Assignment 3 — client with post-test collection
+│
+├── deployment/              # Docker Compose, EC2 setup, ALB config
+├── monitoring/              # Graph generation scripts
 │
 ├── results/                 # Assignment 1 test outputs and charts
 ├── results/v2/              # Assignment 2 test outputs and charts
+├── results/v3/              # Assignment 3 test outputs and charts
 └── doc/                     # Architecture document and diagrams
 ```
 
@@ -148,6 +222,10 @@ ChatFlow_CS6650/
 - **Docker**, **Docker Compose**
 - **AWS ALB**, **AWS EC2**
 - **Python 3** (matplotlib, pandas — graph generation)
+
+### Assignment 3
+- **PostgreSQL 16** (via Spring Data JPA + HikariCP)
+- **AWS RDS** (managed PostgreSQL)
 
 ---
 
