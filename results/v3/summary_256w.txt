@@ -1,45 +1,54 @@
 
 === Load Test Results (256w) ===
 workers=256 messages=500000 rooms=20
-OK=499703 failed=297
-timeSec=427.43
-throughput msg/s=1169.10
-connections=1436
-reconnections=1180
+OK=499997 failed=3
+timeSec=388.82
+throughput msg/s=1285.92
+connections=256
+reconnections=0
 connectionFailures=0
 deadWorkers=0
 === Metrics Summary ===
-OK=499703 failed=297
-durationSec=427.424
+OK=499997 failed=3
+durationSec=388.655
 === Latency (OK only, ms) ===
-mean=191.595
-median=190.000
-p95=283.000
-p99=346.000
-min=13.000 max=939.000
+mean=198.505
+median=198.000
+p95=310.000
+p99=397.000
+min=7.000 max=1443.000
 === Throughput per room (OK only, msg/s) ===
-room 1: 60.27
-room 2: 52.95
-room 3: 59.35
-room 4: 60.49
-room 5: 58.05
-room 6: 61.43
-room 7: 56.20
-room 8: 59.80
-room 9: 60.81
-room 10: 57.88
-room 11: 58.99
-room 12: 59.31
-room 13: 57.41
-room 14: 55.90
-room 15: 59.48
-room 16: 59.99
-room 17: 55.31
-room 18: 54.15
-room 19: 61.32
-room 20: 60.02
+room 1: 63.66
+room 2: 65.50
+room 3: 60.93
+room 4: 62.50
+room 5: 68.11
+room 6: 61.41
+room 7: 65.05
+room 8: 64.71
+room 9: 64.43
+room 10: 61.87
+room 11: 67.33
+room 12: 62.42
+room 13: 65.58
+room 14: 65.19
+room 15: 62.96
+room 16: 64.92
+room 17: 66.50
+room 18: 65.38
+room 19: 63.92
+room 20: 64.12
 === Message type distribution (all statuses) ===
-JOIN: 25896
-TEXT: 448897
-LEAVE: 25207
+JOIN: 26075
+TEXT: 449123
+LEAVE: 24802
 Throughput buckets CSV: /Users/lelinzheng/Developer/Northeastern/ChatFlow_CS6650/client-v3/../results/v3/throughput_10s_256w.csv
+
+=== Consumer DB Stats ===
+consumer.received=499997
+consumer.avgProcessingLatencyMs=3
+db.written=499997
+db.dropped=0
+db.flushCount=3884
+db.avgFlushLatencyMs=13
+db.writtenPerSec=1225
