@@ -1,11 +1,10 @@
-# Client v2: Distributed Load Testing
+# Client v3: Distributed Load Testing
 
-WebSocket load test client for **CS6650 Assignment 2**, redesigned for the distributed server architecture.
-All workers share a single message queue, connect to `/chat`, and encode room in the message body — enabling tunable concurrency across 64 / 128 / 256 / 512 threads without per-room connection management.
+WebSocket load test client for **CS6650 Assignment 3**, extended to collect end-to-end pipeline metrics including consumer DB write stats and server analytics.
 
 ---
 
-## 📋 Features
+## Features
 
 ### Load Testing
 - Single shared `BlockingQueue` across all workers (no per-worker queues)
@@ -20,6 +19,15 @@ All workers share a single message queue, connect to `/chat`, and encode room in
 - Generator-side membership map (single-threaded `HashMap`) ensures TEXT and LEAVE messages always reference a room the user has joined — no discard-and-retry loop
 - Worker-side `RoomMembershipTracker` (`ConcurrentHashMap`) validates membership concurrently before each send
 
+### Echo Matching
+- Each worker sets an `expectedMessageId` before sending; only accepts an echo that contains its own ID
+- On retry, a new UUID is generated so the server deduplicator does not block the retry
+
+### Post-Test Collection
+- Polls `GET /health/stats` on consumer-v3 until the RabbitMQ queue is drained and the batch writer buffer is empty, then fetches final DB write stats
+- Calls `GET /api/metrics` on server-v3 to retrieve full analytics over all persisted messages
+- All stats appended to the run's summary file
+
 ### Metrics
 - Per-message latency (round-trip: send → Redis broadcast echo)
 - Status codes: `OK`, `FAILED_AFTER_RETRIES`, `NO_CONNECTION`, `INVALID_MEMBERSHIP`
@@ -30,7 +38,7 @@ All workers share a single message queue, connect to `/chat`, and encode room in
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Threading Model
 ```
@@ -50,9 +58,18 @@ MessageGenerator
   └── shared BlockingQueue (capacity 10 000)
         └── ConnectionWorker (×N)
               ├── RoomMembershipTracker.validate()
+              ├── set expectedMessageId
               ├── WebSocket send to /chat
-              └── wait for echo (Redis broadcast)
+              └── wait for echo matching expectedMessageId (Redis broadcast)
                     └── MetricRecord → metricsQueue → CsvMetricsWriter
+```
+
+### Post-Test Flow
+```
+LoadTestClient (after runner.runLoadTest())
+  ├── poll GET /health/stats  (every 5s, until drained or 10min timeout)
+  ├── GET /health/stats       (final DB write stats → appended to summary)
+  └── GET /api/metrics        (server analytics → logged to stdout)
 ```
 
 ### Key Design: Why Wait for Echo?
@@ -60,12 +77,12 @@ Each message moves the worker's session to a new room on the server. The server 
 
 ---
 
-## 🚀 Build and Run
+## Build and Run
 
 ### Prerequisites
 - Java 21
 - Maven 3.9+
-- server-v2, consumer, RabbitMQ, and Redis running
+- server-v3, consumer-v3, RabbitMQ, Redis, and PostgreSQL running
 
 ### Build
 ```bash
@@ -73,58 +90,64 @@ mvn clean package
 ```
 
 This creates:
-- `target/chatflow-client-v2-1.0-SNAPSHOT-jar-with-dependencies.jar`
+- `target/chatflow-client-v3-1.0-SNAPSHOT-jar-with-dependencies.jar`
 
 ### Run
 ```bash
-java -jar target/chatflow-client-v2-1.0-SNAPSHOT-jar-with-dependencies.jar
+java -jar target/chatflow-client-v3-1.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 Edit constants in `LoadTestRunner.java` before each run:
 
 ```java
-private static final int TOTAL_WORKERS  = 256;   // tune: 64 / 128 / 256 / 512
+private static final int TOTAL_WORKERS  = 256;     // tune: 64 / 128 / 256 / 512
 private static final int TOTAL_MESSAGES = 500_000; // 1_000_000 for stress test
 private static final int ROOMS          = 20;
 private static final int QUEUE_CAPACITY = 10_000;
 ```
 
-Edit the target URL in `LoadTestClient.java`:
+Edit the target URLs in `LoadTestClient.java`:
 ```java
-String httpBaseUrl = "http://localhost:8080";
+String serverUrl   = "http://localhost:8080";
+String consumerUrl = "http://localhost:8081";
 URI wsBaseUri = URI.create("ws://localhost:8080/chat");
-
-// For ALB:
-// String httpBaseUrl = "http://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com";
-// URI wsBaseUri = URI.create("ws://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com/chat");
 ```
 
 ---
 
-## 📁 Output Files
+## Output Files
 
-After each run, files are saved to `../results/v2/` labeled with the worker count:
+After each run, files are saved to `../results/v3/` labeled with the worker count:
 
 ### `summary_256w.txt`
-Human-readable results including load test stats and full latency analysis:
+Human-readable results including load test stats, full latency analysis, and consumer DB stats:
 ```
 === Load Test Results (256w) ===
 workers=256 messages=500000 rooms=20
-OK=499997 failed=3
+OK=499998 failed=2
 timeSec=88.56
 throughput msg/s=5646.04
 connections=512
-reconnections=286
+reconnections=4
 
 === Latency (OK only, ms) ===
 mean=33.655
 median=34.000
 p95=41.000
 p99=45.000
+
+=== Consumer DB Stats ===
+consumer.received=500000
+consumer.avgProcessingLatencyMs=3
+db.written=500000
+db.dropped=0
+db.flushCount=2425
+db.avgFlushLatencyMs=19
+db.writtenPerSec=1278
 ```
 
 ### `main_metrics_256w.csv`
@@ -145,57 +168,44 @@ bucketStartMillis,count,throughputMsgPerSec
 
 ---
 
-## 📊 Expected Output
+## Expected Output
 
 ```
 Load Test Client Started
-workers=256 messages=500000
 Performing server health check...
-✓ Server health check passed
+✓ Server health check passed: {"status":"UP",...}
 
-=== Starting Load Test ===
-workers=256 messages=500000 rooms=20
+Starting load test...
 
 === Load Test Results (256w) ===
-OK=499997 failed=3
-timeSec=88.56
-throughput msg/s=5646.04
-connections=512
-reconnections=286
-connectionFailures=0
-deadWorkers=0
-
-=== Metrics Summary ===
-OK=499997 failed=3
-durationSec=88.560
-
-=== Latency (OK only, ms) ===
-mean=33.655
-median=34.000
-p95=41.000
-p99=45.000
-min=1.000 max=200.000
-
-=== Throughput per room (OK only, msg/s) ===
-room 1: 280.10
 ...
-room 20: 283.44
 
-=== Message type distribution (all statuses) ===
-TEXT: 440997
-JOIN: 30001
-LEAVE: 28999
+Waiting for consumer to fully drain (RabbitMQ queue + DB buffer)...
+  consumer.received=500000  db.bufferSize=1024  broadcastDlqSize=0
+  consumer.received=500000  db.bufferSize=0     broadcastDlqSize=0
+  consumer.received=500000  db.bufferSize=0     broadcastDlqSize=0
+Consumer fully drained. Proceeding to metrics.
+
+Fetching consumer DB stats...
+=== Consumer DB Stats ===
+consumer.received=500000
+...
+
+Fetching server metrics...
+=== SERVER METRICS ===
+{"totalMessages":500000,"coreQueryInputs":...}
+======================
 ```
 
 ---
 
-## 🔍 Understanding the Metrics
+## Understanding the Metrics
 
 ### Status Codes
 | Code | Meaning |
 |---|---|
 | `OK` | Message echoed back successfully |
-| `FAILED_AFTER_RETRIES` | Failed after 5 retry attempts |
+| `FAILED_AFTER_RETRIES` | Failed after retry attempts |
 | `NO_CONNECTION` | Worker never connected |
 | `INVALID_MEMBERSHIP` | TEXT or LEAVE sent when user not in room (dropped before send) |
 
@@ -204,7 +214,7 @@ Throughput (~5,000–7,000 msg/s with 256 workers) is lower than Assignment 1 (~
 
 ---
 
-## 🧪 Testing
+## Testing
 
 ### Run Unit Tests
 ```bash
@@ -224,13 +234,13 @@ mvn test
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### Server Not Reachable
 ```
 ✗ Server health check failed: Connection refused
 ```
-Ensure server-v2 is running and the URL in `LoadTestClient.java` is correct.
+Ensure server-v3 is running and the URL in `LoadTestClient.java` is correct.
 
 ### Workers Timeout (pool.awaitTermination)
 Increase the timeout in `LoadTestRunner.java` for large message counts:
@@ -240,28 +250,28 @@ if (!pool.awaitTermination(240, TimeUnit.SECONDS)) { ... }
 
 ### Out of Memory
 ```bash
-java -Xmx4G -jar target/chatflow-client-v2-1.0-SNAPSHOT-jar-with-dependencies.jar
+java -Xmx4G -jar target/chatflow-client-v3-1.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
-client-v2/
+client-v3/
 ├── pom.xml
 ├── README.md
 └── src/
     ├── main/
     │   └── java/edu/northeastern/cs6650/client/
-    │       ├── LoadTestClient.java              # Entry point, health check
+    │       ├── LoadTestClient.java              # Entry point, health check, post-test collection
     │       ├── generator/
     │       │   └── MessageGenerator.java        # Seed phase + main phase
     │       ├── loadtest/
     │       │   └── LoadTestRunner.java          # Orchestrator, labeled output
     │       ├── metrics/
-    │       │   ├── CsvMetricsWriter.java
-    │       │   ├── MetricRecord.java
+    │       │   ├── CsvMetricsWriter.java        # Real-time CSV writer
+    │       │   ├── MetricRecord.java            # Per-message record
     │       │   └── MetricsAnalyzer.java         # Stats + file save
     │       ├── model/
     │       │   ├── ChatMessage.java
@@ -271,7 +281,7 @@ client-v2/
     │       │   ├── RandomGenerator.java
     │       │   └── RoomMembershipTracker.java   # Thread-safe membership
     │       └── ws/
-    │           └── ConnectionWorker.java        # WebSocket worker
+    │           └── ConnectionWorker.java        # WebSocket worker + echo matching
     └── test/
         └── java/edu/northeastern/cs6650/client/
             ├── generator/
@@ -289,7 +299,7 @@ client-v2/
 
 ### Output Files (at repo root)
 ```
-../results/v2/
+../results/v3/
 ├── summary_64w.txt
 ├── summary_128w.txt
 ├── summary_256w.txt
@@ -301,18 +311,19 @@ client-v2/
 
 ---
 
-## 🔗 Related Documentation
+## Related Documentation
 
 - [Main Project README](../README.md)
-- [Server v2](../server-v2/README.md)
-- [Consumer](../consumer/README.md)
+- [Server v3](../server-v3/README.md)
+- [Consumer v3](../consumer-v3/README.md)
 - [Monitoring & Graphs](../monitoring/)
 - [Architecture Document](../doc/architecture.md)
 
 ---
 
-## 📝 Notes
+## Notes
 
 - Output files are labeled with the worker count so successive runs never overwrite each other
 - The generator seed phase (1,000 JOINs) is included in the `TOTAL_MESSAGES` count
 - `INVALID_MEMBERSHIP` drops happen at the worker level before any network call — they indicate a race between the generator and workers on the shared membership state, which is expected to be rare
+- The post-test drain poll prints 3 consecutive lines with stable `consumer.received` before declaring done

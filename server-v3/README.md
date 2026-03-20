@@ -1,9 +1,9 @@
-# ChatFlow WebSocket Server v2
+# ChatFlow WebSocket Server (v3)
 
-This module contains the **WebSocket server implementation** for **CS6650 Assignment 2**.
+This module contains the **WebSocket server implementation** for **CS6650 Assignment 3**.
 The server accepts WebSocket connections, validates and deduplicates incoming messages, publishes them to RabbitMQ for distribution, and broadcasts messages back to room members via Redis Pub/Sub.
 
-This is an evolution of the Assignment 1 server, adding queue-based message distribution and horizontal scalability behind an AWS Application Load Balancer.
+In addition to the Assignment 2 capabilities, v3 adds a **REST metrics API** backed by PostgreSQL — enabling post-load-test analytics over all persisted messages.
 
 ---
 
@@ -16,7 +16,9 @@ This is an evolution of the Assignment 1 server, adding queue-based message dist
 - Circuit breaker protecting RabbitMQ publish operations
 - Redis Pub/Sub subscriber for cross-instance broadcast
 - Room session management (`RoomManager`)
+- Thread-safe WebSocket session writes (`synchronized` on each session)
 - Health check REST endpoint
+- **Analytics REST endpoint** (`/api/metrics`) — queries persisted messages in PostgreSQL
 - Deployed on AWS EC2 behind an Application Load Balancer
 
 ---
@@ -28,6 +30,7 @@ This is an evolution of the Assignment 1 server, adding queue-based message dist
 - **Spring WebSocket**
 - **RabbitMQ** (AMQP via `amqp-client`)
 - **Redis** (via `spring-data-redis`)
+- **PostgreSQL** (via `spring-data-jpa` — read-only queries against consumer-written data)
 - **Jackson**
 - **JUnit 5 + Mockito**
 - **JaCoCo**
@@ -110,17 +113,47 @@ The message is echoed back as the original JSON payload to all WebSocket session
 
 ---
 
-### REST API
+## REST API
 
-#### Health Check
+### Health Check
 ```bash
 GET /health
 ```
 ```json
 {
   "status": "UP",
-  "server": "server-1",
+  "serverId": "server-1",
   "timestamp": "2026-03-01T12:00:00Z"
+}
+```
+
+### Metrics
+```bash
+GET /api/metrics?roomId=5&userId=42&startTime=2026-03-01T00:00:00Z&endTime=2026-03-01T01:00:00Z&topN=10&sampleSize=10
+```
+All parameters are optional — if omitted, the endpoint auto-selects the most active room/user and the full time range.
+
+```json
+{
+  "totalMessages": 500000,
+  "coreQueryInputs": {
+    "roomId": "5",
+    "userId": "42",
+    "startTime": "2026-03-01T00:00:00Z",
+    "endTime": "2026-03-01T01:00:00Z"
+  },
+  "coreQueries": {
+    "roomMessagesInTimeRange": [...],
+    "userMessageHistory": [...],
+    "activeUserCount": 1000,
+    "userRoomsParticipated": [...]
+  },
+  "analytics": {
+    "messagesPerMinute": [...],
+    "mostActiveUsers": [...],
+    "mostActiveRooms": [...],
+    "userParticipationPatterns": [...]
+  }
 }
 ```
 
@@ -133,7 +166,7 @@ A custom thread-safe circuit breaker wraps every RabbitMQ publish call.
 | Parameter | Value |
 |---|---|
 | Failure threshold | 5 consecutive failures |
-| Recovery timeout | 30 000 ms |
+| Recovery timeout | 30,000 ms |
 | State transitions | CLOSED → OPEN → HALF_OPEN → CLOSED |
 
 - **CLOSED** — normal operation, all publishes go through
@@ -153,6 +186,10 @@ A custom thread-safe circuit breaker wraps every RabbitMQ publish call.
 `RoomManager` maintains a `ConcurrentHashMap` of `roomId → Set<WebSocketSession>`.
 On each incoming message, the sender's session is moved to the room specified in the message. When a message arrives via Redis Pub/Sub, it is broadcast to all sessions currently in that room across the local instance.
 
+All `session.sendMessage()` calls are guarded with `synchronized(session)` to prevent
+`TEXT_PARTIAL_WRITING` exceptions when multiple Redis listener threads concurrently write
+to the same session.
+
 ---
 
 ## Running Locally
@@ -160,12 +197,12 @@ On each incoming message, the sender's session is moved to the room specified in
 ### Prerequisites
 - Java 21
 - Maven 3.9+
-- RabbitMQ and Redis running (see `deployment/docker-compose.yml`)
+- RabbitMQ, Redis, and PostgreSQL running (see `deployment/docker-compose.yml`)
 
 ### Build and Run
 ```bash
 mvn clean package
-java -jar target/chat-server-v2.jar
+java -jar target/chat-server-v3.jar
 ```
 Default port: **8080**
 
@@ -179,6 +216,10 @@ rabbitmq.password=admin123
 
 spring.data.redis.host=localhost
 spring.data.redis.port=6379
+
+spring.datasource.url=jdbc:postgresql://localhost:5432/chatflow
+spring.datasource.username=chatflow
+spring.datasource.password=chatflow123
 ```
 
 ---
@@ -194,6 +235,17 @@ mvn test
 ```bash
 target/site/jacoco/index.html
 ```
+
+Test coverage:
+- `CircuitBreakerTest` — state transitions, failure threshold, recovery timeout
+- `ChannelPoolTest` — borrow/return semantics, pool exhaustion
+- `RabbitMQConfigTest` — exchange/queue declaration, topology args
+- `MetricsControllerTest` — query parameter defaulting, response shape
+- `QueueMessageTest` — model construction
+- `RedisSubscriberTest` — message deserialization and broadcast delegation
+- `MessageValidatorTest` — all validation rules and edge cases
+- `ChatWebSocketHandlerTest` — message flow, error paths, circuit breaker integration
+- `RoomManagerTest` — session add/remove, broadcast, dead session cleanup
 
 ---
 
@@ -228,7 +280,7 @@ Example message:
 ## Project Structure
 
 ```
-server-v2/
+server-v3/
 ├── pom.xml
 ├── README.md
 └── src/
@@ -246,6 +298,9 @@ server-v2/
     │       │   └── HealthController.java
     │       ├── dedup/
     │       │   └── MessageDeduplicator.java     # Redis-backed deduplication
+    │       ├── metrics/
+    │       │   ├── MetricsController.java       # GET /api/metrics analytics endpoint
+    │       │   └── MetricsRepository.java       # PostgreSQL query methods
     │       ├── model/
     │       │   ├── ClientMessage.java
     │       │   ├── ErrorResponse.java
@@ -260,8 +315,23 @@ server-v2/
     │           └── RoomManager.java             # Session-to-room mapping
     └── test/
         └── java/edu/northeastern/cs6650/chat_server/
-            └── circuitbreaker/
-                └── CircuitBreakerTest.java
+            ├── ChatServerApplicationTests.java
+            ├── circuitbreaker/
+            │   └── CircuitBreakerTest.java
+            ├── config/
+            │   ├── ChannelPoolTest.java
+            │   └── RabbitMQConfigTest.java
+            ├── metrics/
+            │   └── MetricsControllerTest.java
+            ├── model/
+            │   └── QueueMessageTest.java
+            ├── redis/
+            │   └── RedisSubscriberTest.java
+            ├── validation/
+            │   └── MessageValidatorTest.java
+            └── websocket/
+                ├── ChatWebSocketHandlerTest.java
+                └── RoomManagerTest.java
 ```
 
 ---
@@ -269,9 +339,9 @@ server-v2/
 ## Related Documentation
 
 - [Main Project README](../README.md)
-- [Consumer Application](../consumer/README.md)
+- [Consumer v3](../consumer-v3/README.md)
 - [Deployment](../deployment/README.md)
-- [Client v2](../client-v2/README.md)
+- [Client v3](../client-v3/README.md)
 - [Architecture Document](../doc/architecture.md)
 
 ---
