@@ -61,7 +61,7 @@ public class LoadTestClient {
     fetchAndLogConsumerStats(consumerUrl, runner.getSummaryPath());
 
     System.out.println("Fetching server metrics...");
-    fetchAndLogMetrics(serverUrl);
+    fetchAndLogMetrics(serverUrl, runner.getSummaryPath());
   }
 
   /**
@@ -182,7 +182,7 @@ public class LoadTestClient {
    *
    * @param baseUrl the base HTTP URL of server-v3 (e.g., "http://host:port")
    */
-  private static void fetchAndLogMetrics(String baseUrl) {
+  private static void fetchAndLogMetrics(String baseUrl, java.nio.file.Path summaryPath) {
     try {
       HttpClient client = HttpClient.newBuilder()
           .connectTimeout(Duration.ofSeconds(10))
@@ -199,10 +199,13 @@ public class LoadTestClient {
       long reqElapsed = System.currentTimeMillis() - reqStart;
 
       if (response.statusCode() == 200) {
-        System.out.println("=== SERVER METRICS ===");
-        System.out.println("metricsApiRoundTripMs=" + reqElapsed);
-        System.out.println(response.body());
-        System.out.println("======================");
+        String metricsOutput = "\n=== SERVER METRICS ===\n"
+            + "metricsApiRoundTripMs=" + reqElapsed + "\n"
+            + response.body() + "\n"
+            + "======================\n";
+        System.out.print(metricsOutput);
+        java.nio.file.Files.writeString(summaryPath, metricsOutput,
+            java.nio.file.StandardOpenOption.APPEND);
       } else {
         System.err.println("Metrics request failed with status: " + response.statusCode());
       }
