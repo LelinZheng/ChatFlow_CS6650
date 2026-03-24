@@ -53,6 +53,14 @@ public class MetricsController {
       @RequestParam(defaultValue = "10") int topN,
       @RequestParam(defaultValue = "10") int sampleSize) {
 
+    long total = repo.totalMessageCount();
+    if (total == 0) {
+      Map<String, Object> empty = new LinkedHashMap<>();
+      empty.put("totalMessages", 0);
+      empty.put("message", "No messages in database yet.");
+      return ResponseEntity.ok(empty);
+    }
+
     // Resolve defaults from data if params not supplied
     String resolvedRoomId    = roomId    != null ? roomId    : repo.mostActiveRoomId();
     String resolvedUserId    = userId    != null ? userId    : repo.mostActiveUserId();
@@ -60,7 +68,7 @@ public class MetricsController {
     String resolvedEndTime   = endTime   != null ? endTime   : repo.maxTimestamp();
 
     Map<String, Object> response = new LinkedHashMap<>();
-    response.put("totalMessages", repo.totalMessageCount());
+    response.put("totalMessages", total);
 
     // Echo back the inputs used for core queries so the client can log them
     Map<String, Object> inputs = new LinkedHashMap<>();

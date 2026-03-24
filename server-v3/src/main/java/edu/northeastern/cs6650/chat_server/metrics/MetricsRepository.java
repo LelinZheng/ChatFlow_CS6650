@@ -108,12 +108,13 @@ public class MetricsRepository {
    * @return most active roomId string
    */
   public String mostActiveRoomId() {
-    return jdbc.queryForObject("""
+    List<String> results = jdbc.queryForList("""
         SELECT room_id FROM messages
         GROUP BY room_id
         ORDER BY COUNT(*) DESC
         LIMIT 1
         """, String.class);
+    return results.isEmpty() ? null : results.get(0);
   }
 
   /**
@@ -121,12 +122,13 @@ public class MetricsRepository {
    * @return most active userId string
    */
   public String mostActiveUserId() {
-    return jdbc.queryForObject("""
+    List<String> results = jdbc.queryForList("""
         SELECT user_id FROM messages
         GROUP BY user_id
         ORDER BY COUNT(*) DESC
         LIMIT 1
         """, String.class);
+    return results.isEmpty() ? null : results.get(0);
   }
 
   /**
