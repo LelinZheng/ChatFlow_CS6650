@@ -376,11 +376,6 @@ public class ConnectionWorker implements Runnable {
 
     try {
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      // On retry, generate a fresh ID so the server deduplicator doesn't silently
-      // drop the resent message. At-least-once delivery is acceptable here.
-      if (attempt > 1) {
-        message.setMessageId(java.util.UUID.randomUUID().toString());
-      }
       expectedMessageId = message.getMessageId();
 
       long t0 = System.nanoTime();
