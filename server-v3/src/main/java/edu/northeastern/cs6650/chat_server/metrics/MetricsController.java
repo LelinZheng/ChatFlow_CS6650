@@ -51,7 +51,7 @@ public class MetricsController {
       @RequestParam(required = false) String startTime,
       @RequestParam(required = false) String endTime,
       @RequestParam(defaultValue = "10") int topN,
-      @RequestParam(defaultValue = "10") int sampleSize) {
+      @RequestParam(defaultValue = "1000") int sampleSize) {
 
     long total = repo.totalMessageCount();
     if (total == 0) {
@@ -78,25 +78,50 @@ public class MetricsController {
     inputs.put("endTime", resolvedEndTime);
     response.put("coreQueryInputs", inputs);
 
-    // Core queries
+    // Core queries with per-query timing
     Map<String, Object> core = new LinkedHashMap<>();
+    Map<String, Object> timings = new LinkedHashMap<>();
+
+    long t0 = System.currentTimeMillis();
     core.put("roomMessagesInTimeRange",
         repo.roomMessagesInTimeRange(resolvedRoomId, resolvedStartTime, resolvedEndTime, sampleSize));
+    timings.put("roomMessagesInTimeRangeMs", System.currentTimeMillis() - t0);
+
+    t0 = System.currentTimeMillis();
     core.put("userMessageHistory",
         repo.userMessageHistory(resolvedUserId, resolvedStartTime, resolvedEndTime, sampleSize));
+    timings.put("userMessageHistoryMs", System.currentTimeMillis() - t0);
+
+    t0 = System.currentTimeMillis();
     core.put("activeUserCount",
         repo.activeUserCount(resolvedStartTime, resolvedEndTime));
+    timings.put("activeUserCountMs", System.currentTimeMillis() - t0);
+
+    t0 = System.currentTimeMillis();
     core.put("userRoomsParticipated",
         repo.userRoomsParticipated(resolvedUserId));
-    response.put("coreQueries", core);
+    timings.put("userRoomsParticipatedMs", System.currentTimeMillis() - t0);
 
-    // Analytics
+    t0 = System.currentTimeMillis();
     Map<String, Object> analytics = new LinkedHashMap<>();
     analytics.put("messagesPerMinute",    repo.messagesPerMinute());
+    timings.put("messagesPerMinuteMs", System.currentTimeMillis() - t0);
+
+    t0 = System.currentTimeMillis();
     analytics.put("mostActiveUsers",      repo.mostActiveUsers(topN));
+    timings.put("mostActiveUsersMs", System.currentTimeMillis() - t0);
+
+    t0 = System.currentTimeMillis();
     analytics.put("mostActiveRooms",      repo.mostActiveRooms(topN));
+    timings.put("mostActiveRoomsMs", System.currentTimeMillis() - t0);
+
+    t0 = System.currentTimeMillis();
     analytics.put("userParticipationPatterns", repo.userParticipationPatterns(topN));
+    timings.put("userParticipationPatternsMs", System.currentTimeMillis() - t0);
+
+    response.put("coreQueries", core);
     response.put("analytics", analytics);
+    response.put("queryTimingsMs", timings);
 
     return ResponseEntity.ok(response);
   }
