@@ -117,7 +117,7 @@ public class LoadTestRunner {
     // Create and submit all workers sharing the single queue and membership tracker
     for (int i = 0; i < TOTAL_WORKERS; i++) {
       ConnectionWorker worker = new ConnectionWorker(
-          sharedQueue, serverUri, 5, 5000, metricsQueue, membershipTracker);
+          sharedQueue, serverUri, 5, 8000, metricsQueue, membershipTracker);
       workers.add(worker);
       pool.submit(worker);
     }
