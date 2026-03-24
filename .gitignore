@@ -53,3 +53,4 @@ deployment/rabbitmq_data/
 
 # ===== Application Properties =====
 **/application.properties
+load-tests/**/main_metrics.csv
