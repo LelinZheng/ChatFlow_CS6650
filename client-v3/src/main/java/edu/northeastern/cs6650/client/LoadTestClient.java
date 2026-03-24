@@ -36,9 +36,12 @@ public class LoadTestClient {
    */
   public static void main(String[] args) {
     System.out.println("Load Test Client Started");
-    String serverUrl   = "http://localhost:8080";
-    String consumerUrl = "http://localhost:8081";
-    URI wsBaseUri = URI.create("ws://localhost:8080/chat");
+//    String serverUrl   = "http://localhost:8080";
+//    String consumerUrl = "http://localhost:8081";
+//    URI wsBaseUri = URI.create("ws://localhost:8080/chat");
+    String serverUrl   = "http://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com";
+    String consumerUrl = "http://34.219.158.226:8081";
+    URI wsBaseUri = URI.create("ws://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com/chat");
 
     System.out.println("Performing server health check...");
     if (!checkServerHealth(serverUrl)) {
@@ -186,15 +189,18 @@ public class LoadTestClient {
           .build();
 
       HttpRequest request = HttpRequest.newBuilder()
-          .uri(URI.create(baseUrl + "/api/metrics?sampleSize=10"))
+          .uri(URI.create(baseUrl + "/api/metrics?sampleSize=1000"))
           .GET()
-          .timeout(Duration.ofSeconds(30))
+          .timeout(Duration.ofSeconds(60))
           .build();
 
+      long reqStart = System.currentTimeMillis();
       HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      long reqElapsed = System.currentTimeMillis() - reqStart;
 
       if (response.statusCode() == 200) {
         System.out.println("=== SERVER METRICS ===");
+        System.out.println("metricsApiRoundTripMs=" + reqElapsed);
         System.out.println(response.body());
         System.out.println("======================");
       } else {
