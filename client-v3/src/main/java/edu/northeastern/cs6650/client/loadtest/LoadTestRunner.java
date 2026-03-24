@@ -92,10 +92,9 @@ public class LoadTestRunner {
     BlockingQueue<ChatMessage> sharedQueue = new ArrayBlockingQueue<>(QUEUE_CAPACITY);
     List<ConnectionWorker> workers = new ArrayList<>(TOTAL_WORKERS);
     BlockingQueue<MetricRecord> metricsQueue = new ArrayBlockingQueue<>(50_000);
-    Path outDir = Paths.get("..", "results/v3");
+    Path outDir = Paths.get("..", "load-tests");
 
-    // Start metrics writer — file labeled with worker count so runs don't overwrite each other
-    Path mainCsvPath = outDir.resolve("main_metrics_" + runLabel + ".csv");
+    Path mainCsvPath = outDir.resolve("main_metrics.csv");
     Thread metricsWriter = new Thread(
         new CsvMetricsWriter(metricsQueue, mainCsvPath), "metrics-writer");
     metricsWriter.start();
@@ -185,7 +184,7 @@ public class LoadTestRunner {
     System.out.print(results);
 
     // Write results block to summary file (creates/overwrites per run)
-    Path summaryPath = outDir.resolve("summary_" + runLabel + ".txt");
+    Path summaryPath = outDir.resolve("summary.txt");
     try {
       Files.createDirectories(outDir);
       Files.writeString(summaryPath, results.toString());
@@ -196,10 +195,10 @@ public class LoadTestRunner {
 
   /**
    * Returns the path to the summary file for this run.
-   * @return path to summary_{runLabel}.txt
+   * @return path to summary.txt
    */
   public Path getSummaryPath() {
-    return Paths.get("..", "results/v3").resolve("summary_" + runLabel + ".txt");
+    return Paths.get("..", "load-tests").resolve("summary.txt");
   }
 
   /**
@@ -207,10 +206,10 @@ public class LoadTestRunner {
    */
   public void printSummary() {
     System.out.println("\nLoad test summary:");
-    Path outDir = Paths.get("..", "results/v3");
-    Path metricsCsv = outDir.resolve("main_metrics_" + runLabel + ".csv");
-    Path bucketsCsv = outDir.resolve("throughput_10s_" + runLabel + ".csv");
-    Path summaryPath = outDir.resolve("summary_" + runLabel + ".txt");
+    Path outDir = Paths.get("..", "load-tests");
+    Path metricsCsv = outDir.resolve("main_metrics.csv");
+    Path bucketsCsv = outDir.resolve("throughput_10s.csv");
+    Path summaryPath = outDir.resolve("summary.txt");
     try {
       new MetricsAnalyzer().analyzeAndSave(metricsCsv, bucketsCsv, summaryPath);
     } catch (Exception e) {
