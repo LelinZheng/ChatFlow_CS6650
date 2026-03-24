@@ -19,12 +19,11 @@ while true; do
   # Lock wait time (number of queries currently waiting on a lock)
   locks_waiting=$($DB "SELECT COUNT(*) FROM pg_stat_activity WHERE wait_event_type='Lock';" 2>/dev/null | tr -d ' ')
 
-  # Buffer pool hit ratio (blks_hit / (blks_hit + blks_read)) from pg_stat_bgwriter
-  stats=$($DB "SELECT blks_hit, blks_read, buffers_checkpoint, buffers_written FROM pg_stat_bgwriter;" 2>/dev/null)
-  blks_hit=$(echo "$stats" | awk -F'|' '{print $1}' | tr -d ' ')
-  blks_read=$(echo "$stats" | awk -F'|' '{print $2}' | tr -d ' ')
-  buffers_checkpoint=$(echo "$stats" | awk -F'|' '{print $3}' | tr -d ' ')
-  blks_written=$(echo "$stats" | awk -F'|' '{print $4}' | tr -d ' ')
+  # Buffer pool hit ratio from pg_stat_io (PostgreSQL 16+)
+  blks_hit=$($DB "SELECT SUM(hits) FROM pg_stat_io WHERE backend_type='client backend';" 2>/dev/null | tr -d ' ')
+  blks_read=$($DB "SELECT SUM(reads) FROM pg_stat_io WHERE backend_type='client backend';" 2>/dev/null | tr -d ' ')
+  buffers_checkpoint=$($DB "SELECT buffers_checkpoint FROM pg_stat_bgwriter;" 2>/dev/null | tr -d ' ')
+  blks_written=$($DB "SELECT buffers_clean FROM pg_stat_bgwriter;" 2>/dev/null | tr -d ' ')
 
   # Cache hit ratio %
   if [ -n "$blks_hit" ] && [ -n "$blks_read" ] && [ "$((blks_hit + blks_read))" -gt 0 ]; then

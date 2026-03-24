@@ -1,0 +1,476 @@
+Timing is on.
+ room_id 
+---------
+ 8
+(1 row)
+
+Time: 5254.331 ms (00:05.254)
+ user_id 
+---------
+ 28713
+(1 row)
+
+Time: 5733.132 ms (00:05.733)
+ message_id | room_id | user_id | username | content | message_type | created_at 
+------------+---------+---------+----------+---------+--------------+------------
+(0 rows)
+
+Time: 37.937 ms
+              message_id              | room_id | user_id | username  |                     content                      | message_type |          created_at           
+--------------------------------------+---------+---------+-----------+--------------------------------------------------+--------------+-------------------------------
+ 8bb19b4b-1f0d-4b4e-9068-909e16773ee1 | 6       | 28713   | user28713 | Scaling up the service.                          | LEAVE        | 2026-03-24 22:19:42.904072+00
+ f3575182-2bd4-405c-838e-b5f729baaa91 | 6       | 28713   | user28713 | Reading documentation again.                     | TEXT         | 2026-03-24 22:19:41.633007+00
+ 7719bf11-adf7-4647-a3a8-15ba6a6524c3 | 6       | 28713   | user28713 | Code reviews are important.                      | TEXT         | 2026-03-24 22:19:40.834095+00
+ 24aab1e7-efc8-4e12-9903-8b0689e1a7bd | 6       | 28713   | user28713 | Does anyone have deployment tips?                | TEXT         | 2026-03-24 22:19:40.716465+00
+ 0a0187a0-3038-4f7c-ad97-0b7716a2e336 | 6       | 28713   | user28713 | It's a beautiful day outside.                    | TEXT         | 2026-03-24 22:19:40.63493+00
+ 1b9b3d15-ed0d-4d91-a477-d372b60e251c | 6       | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 22:19:40.349899+00
+ b4af0a57-904c-438f-8bf3-06edc64751dd | 6       | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 22:19:40.071842+00
+ c7173081-47f9-45cd-b64f-2f533eb00e2b | 6       | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 22:19:39.715332+00
+ 6c07143c-a4f1-4c43-be5e-f23d74ab5e85 | 6       | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 22:19:39.319048+00
+ 32c82b77-7fc8-45fe-a864-750ab83ebfa4 | 6       | 28713   | user28713 | Coffee or tea?                                   | TEXT         | 2026-03-24 22:19:37.649248+00
+ 7c3c347a-b719-4212-8f67-59985399d258 | 6       | 28713   | user28713 | Waiting for tests to finish.                     | TEXT         | 2026-03-24 22:19:37.62036+00
+ f77d709e-04e0-4d85-90ca-e6aba4836983 | 6       | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 22:19:37.233313+00
+ 50b63e27-4f77-4f5c-8b23-0a2008fd3227 | 6       | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 22:19:37.231331+00
+ a6524808-0dc5-41b3-aae6-89da13216679 | 6       | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 22:19:36.489015+00
+ 939b41d1-68ef-430b-9cfd-de02f52411e5 | 6       | 28713   | user28713 | Performance matters.                             | TEXT         | 2026-03-24 22:19:36.475431+00
+ 2648f54c-f7d2-4a1c-b42a-683e8f74319e | 6       | 28713   | user28713 | Still waiting on feedback.                       | TEXT         | 2026-03-24 22:19:35.965974+00
+ 85f77149-7934-4704-af52-d77b92556475 | 6       | 28713   | user28713 | Pair programming is fun.                         | TEXT         | 2026-03-24 22:19:35.652991+00
+ 5933f888-e0ae-4035-a52b-ab29c829bcc0 | 6       | 28713   | user28713 | Just pushed some code to GitHub.                 | TEXT         | 2026-03-24 22:19:34.575723+00
+ 64bad1e1-3c4a-4815-84d5-802bde57e282 | 6       | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 22:19:34.486871+00
+ 539c4fa8-6fcd-4407-bc23-e147d4d7e462 | 6       | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 22:19:34.445917+00
+ 74eef0a7-bdcb-4fc5-880b-7185d292532b | 6       | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 22:19:34.31928+00
+ 0273f1d8-26d8-4e4d-998e-cebe9527f2d4 | 6       | 28713   | user28713 | It's a beautiful day outside.                    | TEXT         | 2026-03-24 22:19:33.570521+00
+ 12f6ab38-d83a-4ff5-a5d0-845652fbbc28 | 6       | 28713   | user28713 | Late night coding session.                       | TEXT         | 2026-03-24 22:19:33.400488+00
+ e205a54f-2b65-47bd-bbb5-e7cd7e51aec3 | 6       | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 22:19:33.343036+00
+ b744fc2a-5eed-4dde-a445-2b221fff3e18 | 6       | 28713   | user28713 | Just finished a great book!                      | TEXT         | 2026-03-24 22:19:31.973277+00
+ 7d6c1a0b-96ae-4b55-80aa-aa97a1f6e491 | 6       | 28713   | user28713 | Anyone working remotely today?                   | TEXT         | 2026-03-24 22:19:31.872738+00
+ 53697e64-072e-44fe-ae16-9a6b5ff27238 | 6       | 28713   | user28713 | Trying to reduce latency.                        | TEXT         | 2026-03-24 22:19:31.747086+00
+ 710298b5-a64f-4c9f-b2e9-eb68eb0e3b90 | 6       | 28713   | user28713 | Backend or frontend?                             | TEXT         | 2026-03-24 22:19:31.674947+00
+ 3bcfa5ee-1de7-4668-939d-6de6a800c89a | 6       | 28713   | user28713 | Does anyone have tips for debugging?             | TEXT         | 2026-03-24 22:19:30.762988+00
+ a3bb1cde-54f8-4545-97ea-f8ca75e7cf32 | 6       | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 22:19:29.756553+00
+ dc3c1784-950a-4dac-9307-d4f2fdd84281 | 6       | 28713   | user28713 | Writing unit tests.                              | TEXT         | 2026-03-24 22:19:28.103978+00
+ cdd9a443-b4d7-4c31-a2db-f56f804635ea | 6       | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 22:19:27.189615+00
+ b7eeed59-833d-40fe-ac2b-1adc40b41962 | 6       | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 22:19:26.641971+00
+ fbb9e6d6-e49f-48fb-b98c-75e9417801ed | 6       | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 22:19:26.588489+00
+ 459b03c8-7be8-43f2-83b3-4c17c4f549f9 | 6       | 28713   | user28713 | Anyone attending the next meetup?                | TEXT         | 2026-03-24 22:19:25.145372+00
+ 5282580c-0e79-45ad-862f-d8ef49ca4094 | 6       | 28713   | user28713 | Still waiting on feedback.                       | TEXT         | 2026-03-24 22:19:25.010491+00
+ ca2dbf71-55ca-4c3b-bcdd-fb6ae5e455ae | 6       | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 22:19:24.917069+00
+ 74dad44d-7d3b-40b8-be35-bc430121ed27 | 6       | 28713   | user28713 | Good morning!                                    | TEXT         | 2026-03-24 22:19:24.498734+00
+ 2e5dda39-d7f6-4044-a63f-e802f612329c | 6       | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 22:19:22.955188+00
+ c0cbe977-194e-462c-974f-e55740196370 | 6       | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 22:19:22.460922+00
+ f3fab0d7-a6d0-4c9f-85f1-53bc9da17c2e | 6       | 28713   | user28713 | Scalability is key.                              | TEXT         | 2026-03-24 22:19:20.740118+00
+ d65076dd-1679-4c17-9b92-95f2bed2e7e5 | 6       | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 22:19:19.292816+00
+ 2d7c1d34-b9aa-4ebd-8aa5-f0aa2f9fe5b1 | 6       | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 22:19:18.799452+00
+ 5dc7c82e-9100-43c6-92e7-bb3670c52172 | 6       | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 22:19:18.366638+00
+ d888e5c3-9d65-4685-a5f2-c5374da37831 | 6       | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 22:19:16.621914+00
+ fa1c7826-6855-4337-864c-68239d3138be | 6       | 28713   | user28713 | Time for a break.                                | TEXT         | 2026-03-24 22:19:16.607745+00
+ 91308a8e-6e75-4ec0-b498-6abaa1416926 | 6       | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 22:19:15.564413+00
+ 1645dbec-8581-443d-a289-1792566758d3 | 6       | 28713   | user28713 | Time for a break.                                | TEXT         | 2026-03-24 22:19:15.491716+00
+ 263ce8e2-7f09-474c-9a7c-8d5f51dd69f9 | 6       | 28713   | user28713 | Almost done with this feature.                   | TEXT         | 2026-03-24 22:19:14.073109+00
+ af4e0057-ab81-4b1f-b1de-4ad661b7efdf | 6       | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 22:19:14.048779+00
+ 89619e4b-fbc5-4f3a-8140-996ef4c93fcf | 6       | 28713   | user28713 | Scalability is key.                              | TEXT         | 2026-03-24 22:19:13.339017+00
+ 8e0d1f8a-f855-4790-9bfe-982c61efd2b3 | 6       | 28713   | user28713 | Just pushed some code to GitHub.                 | TEXT         | 2026-03-24 22:19:12.614909+00
+ d580c054-6595-4e5b-af0b-f50e31ddc9b9 | 6       | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 22:19:11.778469+00
+ 04bf6793-9e42-491e-afe9-e37a845d6359 | 6       | 28713   | user28713 | Just joined the channel!                         | JOIN         | 2026-03-24 22:19:11.400884+00
+ 3517278f-c95d-49d5-aeb1-b6221cb89551 | 4       | 28713   | user28713 | Monitoring system metrics.                       | LEAVE        | 2026-03-24 22:14:08.656044+00
+ 15c55eec-a8aa-45af-a8e8-d6dede171732 | 4       | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 22:14:08.474062+00
+ fa8995db-e206-44e1-929a-33dac0ad32a5 | 4       | 28713   | user28713 | Time for a break.                                | TEXT         | 2026-03-24 22:14:07.496808+00
+ 2aa82d49-6a02-4f4a-b41a-b33639c6b7ce | 4       | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 22:14:07.067524+00
+ 9a01f252-8411-44b3-81f6-65d726ea6c13 | 4       | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 22:14:07.049884+00
+ fb71fd98-9eb9-4df8-8a45-7eae8eea41c1 | 4       | 28713   | user28713 | Full stack development is challenging.           | TEXT         | 2026-03-24 22:14:06.497616+00
+ b0278c31-3dc7-4d0c-b9e9-b6cb6f5c78df | 4       | 28713   | user28713 | Looking forward to the weekend.                  | TEXT         | 2026-03-24 22:14:04.891221+00
+ 8ceac461-04e3-4960-af67-a8de31770219 | 4       | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 22:14:04.474527+00
+ fdf2731e-32a5-43e4-9c83-20c20f049feb | 4       | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 22:14:03.430461+00
+ 9b2c4799-f94a-45ef-9bf4-bead294b8bb9 | 4       | 28713   | user28713 | Backend or frontend?                             | TEXT         | 2026-03-24 22:14:02.839487+00
+ c150a98c-01a4-4ae6-b6e8-2900b44de5c3 | 4       | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 22:14:02.417334+00
+ ba245240-dd2d-4355-8e68-5ff210ab8e65 | 4       | 28713   | user28713 | Learning something new every day!                | TEXT         | 2026-03-24 22:14:00.827727+00
+ ad3e00e0-67fe-4900-947c-80e2b2d9b817 | 4       | 28713   | user28713 | Time for a break.                                | TEXT         | 2026-03-24 22:14:00.25053+00
+ 48b79add-e708-4939-912b-553bd22b16eb | 4       | 28713   | user28713 | Just pushed some code to GitHub.                 | TEXT         | 2026-03-24 22:13:59.836618+00
+ 04300b3f-0998-4853-af0e-d66c7be1fbfb | 4       | 28713   | user28713 | Looking forward to the weekend.                  | TEXT         | 2026-03-24 22:13:59.247967+00
+ 3b65e95a-666b-46b9-9a9c-9c50b6767ec3 | 4       | 28713   | user28713 | Good afternoon!                                  | TEXT         | 2026-03-24 22:13:59.043185+00
+ b352852e-786d-43cd-8252-44eb633593ce | 4       | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 22:13:58.745343+00
+ 87b5ead8-226a-4adf-95dd-0749003a0037 | 4       | 28713   | user28713 | Hello everyone!                                  | TEXT         | 2026-03-24 22:13:58.718366+00
+ eafe65fc-967a-445f-b0aa-ce158d9aaf3b | 4       | 28713   | user28713 | Trying to reduce latency.                        | TEXT         | 2026-03-24 22:13:58.117058+00
+ 6f9430b2-330b-4473-9858-b9aaece05d39 | 4       | 28713   | user28713 | Time for a break.                                | TEXT         | 2026-03-24 22:13:57.62027+00
+ ad367e9c-1ab3-461b-9201-3e347c77d10d | 4       | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 22:13:57.141875+00
+ ccf29dd6-f242-4ef9-add1-34e80c1899ee | 4       | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 22:13:56.42342+00
+ e461ce06-8762-429a-89a2-edca232265a9 | 4       | 28713   | user28713 | Learning something new every day!                | TEXT         | 2026-03-24 22:13:55.952448+00
+ 7a9ff592-158c-4168-9f8a-6068aa74710c | 4       | 28713   | user28713 | Trying to reduce latency.                        | TEXT         | 2026-03-24 22:13:55.648994+00
+ cf14c13c-18a6-42b0-8046-4ee9f6748d23 | 4       | 28713   | user28713 | Does anyone have tips for debugging?             | TEXT         | 2026-03-24 22:13:55.524217+00
+ 373635d5-dea2-4953-b456-64c496f9f5ab | 4       | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 22:13:55.320651+00
+ d420fa52-25a5-4cf4-8dbd-58eb99c7ca00 | 4       | 28713   | user28713 | Trying to reduce latency.                        | TEXT         | 2026-03-24 22:13:55.136905+00
+ e31665cd-1509-4b3e-ba95-d7134777129b | 4       | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 22:13:54.835081+00
+ a7e9b916-7669-41ee-bc9b-7207fab1043b | 4       | 28713   | user28713 | Everything looks stable so far.                  | TEXT         | 2026-03-24 22:13:54.426968+00
+ db74c776-b2ec-4ee9-ba9b-a1b25f111f16 | 4       | 28713   | user28713 | Anyone attending the next meetup?                | TEXT         | 2026-03-24 22:13:54.051707+00
+ 16269edc-7b01-4141-8b2e-3abf6d2193ee | 4       | 28713   | user28713 | Just deployed my app!                            | JOIN         | 2026-03-24 22:13:54.021948+00
+ bb8ccdaa-2a77-4529-810a-2cc768ed50c8 | 8       | 28713   | user28713 | Writing unit tests.                              | LEAVE        | 2026-03-24 21:57:50.576672+00
+ 51e78c64-b951-4908-b6f8-ad644593d863 | 8       | 28713   | user28713 | Anyone up for a chat?                            | TEXT         | 2026-03-24 21:57:50.23332+00
+ b23ce6b3-8a28-4115-b085-90d0b885a18b | 8       | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:57:49.461217+00
+ ad7f44bf-f768-4c04-b6a7-8b5211d3a64d | 8       | 28713   | user28713 | Trying to reduce latency.                        | TEXT         | 2026-03-24 21:57:49.241327+00
+ 28637564-f9c9-4cc8-9058-c35eac73a5dc | 8       | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 21:57:48.25914+00
+ c8dfc070-9e9e-41cd-8dcc-bac49a8b2208 | 8       | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:57:48.056261+00
+ a271cdb4-5921-40da-b60f-d8ff5a304390 | 8       | 28713   | user28713 | Writing unit tests.                              | TEXT         | 2026-03-24 21:57:47.957691+00
+ 57997104-24f2-4cf0-92fd-25bd12534828 | 8       | 28713   | user28713 | Reading documentation again.                     | TEXT         | 2026-03-24 21:57:47.678997+00
+ 70d82f19-07df-495b-bdc6-ed3fd80539b2 | 8       | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 21:57:47.4621+00
+ da2345ad-2ea2-4dcf-ae6a-aebc911063c7 | 8       | 28713   | user28713 | Reading documentation again.                     | TEXT         | 2026-03-24 21:57:47.454017+00
+ 5ca010d1-5ea6-4fcc-8ea0-b73f2bcd311a | 8       | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:57:46.930719+00
+ 74b8abc6-4468-4bf8-b608-07dbd5d1990a | 8       | 28713   | user28713 | Reading documentation again.                     | TEXT         | 2026-03-24 21:57:46.341616+00
+ fe1a0795-34b2-40e8-bbb3-281c7fcc254d | 8       | 28713   | user28713 | This API is pretty neat.                         | TEXT         | 2026-03-24 21:57:46.157044+00
+ 803969b5-d347-4794-a901-4ad48f3ff660 | 8       | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 21:57:44.978435+00
+ 572dee24-35bf-46cf-828a-a5abe027bb7a | 8       | 28713   | user28713 | Does anyone have deployment tips?                | TEXT         | 2026-03-24 21:57:44.886847+00
+ 7011c129-1f2c-4dec-b023-3afffdb1b556 | 8       | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:57:42.384417+00
+ a18d3a98-739a-4215-b7b8-643847ea6229 | 8       | 28713   | user28713 | This API is pretty neat.                         | TEXT         | 2026-03-24 21:57:42.197338+00
+ e34c4613-fbac-495c-9686-5a68e1dc6fec | 8       | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:57:41.730605+00
+ e57d716c-5e66-4353-8f0c-adcdd03ceb7a | 8       | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 21:57:41.243342+00
+ 63a88280-6b12-48bd-b3e4-81b0e798106a | 8       | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 21:57:40.017269+00
+ 83a64f07-1483-4bd6-b79b-bc8fb1736478 | 8       | 28713   | user28713 | Learning something new every day!                | TEXT         | 2026-03-24 21:57:38.661248+00
+ 17c72b24-adc1-4f51-a6e5-291d7845db02 | 8       | 28713   | user28713 | Just finished a great book!                      | TEXT         | 2026-03-24 21:57:38.563764+00
+ 0a0fb476-b707-486b-acc4-b934acfd1616 | 8       | 28713   | user28713 | Everything looks stable so far.                  | TEXT         | 2026-03-24 21:57:36.12058+00
+ 399d8255-8bdc-46ff-a3fe-a04ef31a9a9b | 8       | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 21:57:34.610836+00
+ ab164902-f656-415e-b7e8-51a7ebf608b2 | 8       | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:57:34.086079+00
+ afc26ff4-87ae-4003-bc83-ea38c40956fe | 8       | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:57:33.827303+00
+ cc842331-a3c2-4999-b10d-77ac9b443b2d | 8       | 28713   | user28713 | Running benchmarks right now.                    | TEXT         | 2026-03-24 21:57:33.343883+00
+ 79b5636e-ed7f-4e5e-bccc-a81d01cf249e | 8       | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:57:31.430694+00
+ 5369e0f0-d3e7-435c-b8be-2db4119d3120 | 8       | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:57:30.696259+00
+ 2a725b3c-d246-491c-ab86-a0b3614daefa | 8       | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 21:57:30.677843+00
+ aafaa0ed-6e46-4a58-b433-cd30c0faecb4 | 8       | 28713   | user28713 | Anyone working remotely today?                   | TEXT         | 2026-03-24 21:57:30.108758+00
+ 7f6ec06d-72c3-48a1-abec-851327aad664 | 8       | 28713   | user28713 | Late night coding session.                       | TEXT         | 2026-03-24 21:57:29.558094+00
+ 7eac8d77-ae8a-41e6-8208-f3b0ce452c94 | 8       | 28713   | user28713 | Hello everyone!                                  | TEXT         | 2026-03-24 21:57:27.783174+00
+ d263ccb5-1535-4280-afb6-325ccba07017 | 8       | 28713   | user28713 | Code reviews are important.                      | TEXT         | 2026-03-24 21:57:27.511903+00
+ ff16f563-856b-411e-a73e-bf9e30979984 | 8       | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 21:57:25.986552+00
+ 93f174d2-d55f-4a12-b1e4-f4df2421fc04 | 8       | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:57:23.856673+00
+ 6f150479-fd6b-4943-9118-e63582c3461a | 8       | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:57:23.503907+00
+ bc6e5691-12e5-4442-a80b-35887c59b880 | 8       | 28713   | user28713 | Waiting for tests to finish.                     | TEXT         | 2026-03-24 21:57:22.906804+00
+ d165eb5d-f9c7-44c6-b1ac-2f8879de87bb | 8       | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:57:22.863002+00
+ eefbab53-1a81-4c18-a778-91d0ee26c8e6 | 8       | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:57:22.779395+00
+ 023cef6f-a93a-46fe-820e-8e3c6fb31fff | 8       | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 21:57:22.420574+00
+ 55587172-967e-434d-8226-6e161390245b | 8       | 28713   | user28713 | Full stack development is challenging.           | TEXT         | 2026-03-24 21:57:21.490568+00
+ a162325f-1bd2-4d55-9657-1af90fa8a0d3 | 8       | 28713   | user28713 | Backend or frontend?                             | TEXT         | 2026-03-24 21:57:20.479832+00
+ 73d9ad75-77f6-445c-a36b-1ceb773b0ad3 | 8       | 28713   | user28713 | Pair programming is fun.                         | TEXT         | 2026-03-24 21:57:20.255045+00
+ 056f8018-229a-4003-b60b-d8763ff7fbbc | 8       | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:57:19.607295+00
+ acda2970-47ad-4368-ae01-ef8362b07605 | 8       | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:57:19.361932+00
+ 004bd97a-6c2d-4826-a54f-79b581af0b0b | 8       | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 21:57:17.284855+00
+ a261616b-a2b1-4b05-9108-9e2ea1da4d5f | 8       | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 21:57:16.446745+00
+ cb50c8fe-9fde-4c93-b418-157ed88bc824 | 8       | 28713   | user28713 | Refactoring old code.                            | TEXT         | 2026-03-24 21:57:15.733162+00
+ a33b81be-4507-4858-a34f-addd8bbd98f8 | 8       | 28713   | user28713 | Anyone attending the next meetup?                | TEXT         | 2026-03-24 21:57:14.34165+00
+ 4ae29b95-37f1-413d-bcb4-9893404eff56 | 8       | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:57:14.01059+00
+ 16c6055f-a01f-4b16-9b5f-bd79958ec7ce | 8       | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:57:13.085158+00
+ 903614c5-9daa-4744-ab6d-bf3bb258d51e | 8       | 28713   | user28713 | Everything looks stable so far.                  | TEXT         | 2026-03-24 21:57:12.868873+00
+ 0d164db0-536c-44fb-9bcb-3c95b657ce2c | 8       | 28713   | user28713 | Good afternoon!                                  | TEXT         | 2026-03-24 21:57:11.961687+00
+ 94d3920b-02f2-4b81-a4d7-a9e14d1849ba | 8       | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 21:57:11.469466+00
+ 178b0cd7-9436-43a7-96f7-587ab9b15db9 | 8       | 28713   | user28713 | Running benchmarks right now.                    | TEXT         | 2026-03-24 21:57:11.189177+00
+ fce342b7-b125-47ed-aa68-5f78d323251d | 8       | 28713   | user28713 | Refactoring old code.                            | TEXT         | 2026-03-24 21:57:10.423032+00
+ 38999a5f-61c8-472d-b0f1-b767ae4e2af8 | 8       | 28713   | user28713 | Almost done with this feature.                   | TEXT         | 2026-03-24 21:57:10.138821+00
+ 23e0ae7b-fa47-4bad-b3c5-3361e67a0f4f | 8       | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:57:09.977652+00
+ 021028e5-f043-47e7-8feb-4ca9aa4cbe87 | 8       | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:57:09.363266+00
+ 7883e82a-aa7c-42f6-b42b-6c71429fd6c5 | 8       | 28713   | user28713 | Backend or frontend?                             | TEXT         | 2026-03-24 21:57:09.191994+00
+ 01ae65be-978f-4859-ba30-1dea43d5168d | 8       | 28713   | user28713 | Just pushed some code to GitHub.                 | TEXT         | 2026-03-24 21:57:08.908334+00
+ 25f826ed-3291-440d-979e-0bef5d59b0bb | 8       | 28713   | user28713 | Just pushed some code to GitHub.                 | TEXT         | 2026-03-24 21:57:08.124495+00
+ b9cdf61b-6d5f-466f-952a-4d6947ab6b08 | 8       | 28713   | user28713 | Code reviews are important.                      | TEXT         | 2026-03-24 21:57:07.532487+00
+ dc61ecac-52ad-44cc-878e-9346549dfa55 | 8       | 28713   | user28713 | This API is pretty neat.                         | TEXT         | 2026-03-24 21:57:07.112898+00
+ 0d1cea8e-e3e3-4366-968a-d88d7ba24539 | 8       | 28713   | user28713 | Learning something new every day!                | TEXT         | 2026-03-24 21:57:06.617143+00
+ b7a5c284-d6fa-4b1b-a858-82fca40d0f3c | 8       | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:57:05.727787+00
+ a3fbab51-7510-4b8e-a74a-3d8b9d3a97e4 | 8       | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 21:57:05.638003+00
+ a527fcec-96a0-4651-ad7d-60684f3421a6 | 8       | 28713   | user28713 | Just pushed some code to GitHub.                 | TEXT         | 2026-03-24 21:57:05.091117+00
+ 83f5b797-4c86-43a1-ba83-c0b952cf1db7 | 8       | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:57:04.14384+00
+ b8587bce-366d-4991-baa4-fcbaaf6392c3 | 8       | 28713   | user28713 | Does anyone have deployment tips?                | TEXT         | 2026-03-24 21:57:02.01193+00
+ 51dddc16-3c1e-4f90-be5a-f829609abb69 | 8       | 28713   | user28713 | Scalability is key.                              | TEXT         | 2026-03-24 21:57:01.341842+00
+ fbc5c055-40af-4f08-bb21-c39f30d0f110 | 8       | 28713   | user28713 | Full stack development is challenging.           | TEXT         | 2026-03-24 21:57:00.763771+00
+ dd0b9537-744d-4a0e-8018-355f7b26d9cf | 8       | 28713   | user28713 | Everything looks stable so far.                  | TEXT         | 2026-03-24 21:57:00.381834+00
+ d9a52dac-9b41-486c-a24c-1992d5a0cff1 | 8       | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:56:59.988728+00
+ 421dab89-df75-4671-80ce-9b9004bf8aa0 | 8       | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 21:56:59.927889+00
+ 4e2eef94-8a7a-44fc-a247-143c4b278002 | 8       | 28713   | user28713 | Coffee or tea?                                   | TEXT         | 2026-03-24 21:56:59.489013+00
+ 9a876bbb-7879-480b-a747-16c280c2619a | 8       | 28713   | user28713 | Waiting for tests to finish.                     | TEXT         | 2026-03-24 21:56:58.860695+00
+ 2586928e-e12e-4e8a-bd76-0085fe887c26 | 8       | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 21:56:56.095499+00
+ 87c265d8-0b8b-4df1-ab5a-d9430788dc3d | 8       | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:56:56.060625+00
+ 97ab67f7-4f1a-405d-a993-3dcb79cb473b | 8       | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 21:56:54.064236+00
+ 82cbe59f-baa7-47c6-a96a-55a655b9ee97 | 8       | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:56:53.195849+00
+ 6cc865ac-7d1f-4db5-a0c0-f59927249e96 | 8       | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 21:56:53.027156+00
+ 42d4ef6d-20c1-4f10-b665-f185cf68f244 | 8       | 28713   | user28713 | Writing unit tests.                              | TEXT         | 2026-03-24 21:56:51.093872+00
+ 54661b44-02a9-463a-88bf-d680e9dc4959 | 8       | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:56:51.013695+00
+ 3331e22f-a952-4707-8b80-f52454c38304 | 8       | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:56:49.542273+00
+ 8827f30f-777c-4923-b017-2fe8a35fd648 | 8       | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:56:49.475606+00
+ 35a50189-3fc4-48f0-91a4-913b94935dcf | 8       | 28713   | user28713 | Almost done with this feature.                   | TEXT         | 2026-03-24 21:56:49.441862+00
+ 870e9064-abdd-46c7-a017-6e34f1fb5682 | 8       | 28713   | user28713 | Anyone working remotely today?                   | TEXT         | 2026-03-24 21:56:49.372116+00
+ 99761768-6b94-4b38-b8be-e82334929c6f | 8       | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:56:48.742985+00
+ 111d6e1b-9f4e-4ef2-a78f-ad08b86824b7 | 8       | 28713   | user28713 | Reading documentation again.                     | TEXT         | 2026-03-24 21:56:48.638114+00
+ 2d9f397f-1c82-4129-b3dc-66d26c327a2f | 8       | 28713   | user28713 | Looking forward to the weekend.                  | TEXT         | 2026-03-24 21:56:47.70664+00
+ 48e7a472-a18e-4560-8f45-e0b8a3928e06 | 8       | 28713   | user28713 | Waiting for tests to finish.                     | TEXT         | 2026-03-24 21:56:47.413072+00
+ 0349bbba-9597-44c0-9ea6-c21510971bee | 8       | 28713   | user28713 | Learning something new every day!                | TEXT         | 2026-03-24 21:56:45.844175+00
+ 295fa9e2-ce87-4138-a36a-7eeeb0d0bff6 | 8       | 28713   | user28713 | Coffee or tea?                                   | TEXT         | 2026-03-24 21:56:44.279704+00
+ 692190b8-7a36-4cd1-96cf-6ba340b01f2a | 8       | 28713   | user28713 | Almost done with this feature.                   | TEXT         | 2026-03-24 21:56:44.205742+00
+ f9499a21-596d-4bd0-a5b7-e2ddd5dc3d8b | 8       | 28713   | user28713 | Full stack development is challenging.           | TEXT         | 2026-03-24 21:56:44.094231+00
+ 51582b26-25ce-4ec3-8c32-a67749f33415 | 8       | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 21:56:42.534596+00
+ d136bcf3-68f5-4270-8b7e-a991031166ac | 8       | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 21:56:41.960318+00
+ 563bad22-6d44-4fa2-bc6c-b9c2531298e6 | 8       | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 21:56:41.850663+00
+ 9e6fd41d-48f8-4bba-a074-bcc26025394b | 8       | 28713   | user28713 | Anyone up for a chat?                            | TEXT         | 2026-03-24 21:56:41.004113+00
+ 034a7707-0f73-4498-b285-f5edd210f67a | 8       | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 21:56:39.859677+00
+ 263e02f0-a8de-479b-9f2d-d03eeaef9d7f | 8       | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:56:38.901136+00
+ 77db25aa-451d-4e12-a516-145c0c56b537 | 8       | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:56:36.857047+00
+ 020af136-53fc-4fb2-ad8a-a624d45fc139 | 8       | 28713   | user28713 | Does anyone have deployment tips?                | TEXT         | 2026-03-24 21:56:36.429681+00
+ e4b99fb8-299b-4a61-9d8e-774af5523b68 | 8       | 28713   | user28713 | Trying to reduce latency.                        | TEXT         | 2026-03-24 21:56:36.366599+00
+ c3225a86-4c45-4c8e-8e8b-c7c4e21d7489 | 8       | 28713   | user28713 | Just finished a great book!                      | TEXT         | 2026-03-24 21:56:36.284457+00
+ 0c3113bd-7c1b-4dbb-b0c7-3c44c8ac36c3 | 8       | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 21:56:35.643427+00
+ f94408b1-fc49-4901-a0ac-212f5fb373cc | 8       | 28713   | user28713 | Full stack development is challenging.           | TEXT         | 2026-03-24 21:56:34.715862+00
+ 3b24113a-b689-4cd9-bb5d-830ee7a5879d | 8       | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:56:33.025635+00
+ 65b6bfc2-bb60-4c1e-b36f-784680a373db | 8       | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 21:56:29.582805+00
+ da44405e-bf0d-4786-83fe-d4dcbf1c3d9d | 8       | 28713   | user28713 | Does anyone have tips for debugging?             | TEXT         | 2026-03-24 21:56:28.890696+00
+ 559b06fe-9bda-4066-afbc-990989d40f1c | 8       | 28713   | user28713 | Coffee or tea?                                   | TEXT         | 2026-03-24 21:56:28.229085+00
+ 80ee9100-b86f-4f66-96ad-1bf6ae6a1e0b | 8       | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:56:27.406009+00
+ 48f42445-77ab-4056-ad73-bbb73ed51366 | 8       | 28713   | user28713 | Anyone attending the next meetup?                | TEXT         | 2026-03-24 21:56:27.29896+00
+ 30fe4e8c-cf8f-4320-89d6-47c8d82e8ad2 | 8       | 28713   | user28713 | Pair programming is fun.                         | TEXT         | 2026-03-24 21:56:27.162544+00
+ df53d191-d045-400b-bf48-dcf8faf7b57d | 8       | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:56:25.370246+00
+ 388cb37c-db98-4ff4-8eb2-8621cb987e1c | 8       | 28713   | user28713 | Still waiting on feedback.                       | TEXT         | 2026-03-24 21:56:25.177538+00
+ 6c1d3e61-479f-4318-87bd-6f346da1e81f | 8       | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 21:56:24.757466+00
+ 4dca2250-4101-4baa-9353-60252fbd696f | 8       | 28713   | user28713 | Running benchmarks right now.                    | TEXT         | 2026-03-24 21:56:24.721715+00
+ 031bd93e-f571-4a99-83e8-26b8545e3912 | 8       | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:56:24.719129+00
+ e7f31c39-57ff-4c70-a023-f6d370a0b431 | 8       | 28713   | user28713 | Waiting for tests to finish.                     | TEXT         | 2026-03-24 21:56:24.674841+00
+ 477c41fb-9b26-4c85-96bb-5bc1e60c3ee7 | 8       | 28713   | user28713 | Just finished a great book!                      | TEXT         | 2026-03-24 21:56:24.651633+00
+ 0b484b9f-d558-4346-b3c5-04d1358b5a5c | 8       | 28713   | user28713 | Time for a break.                                | TEXT         | 2026-03-24 21:56:23.479879+00
+ 9dad8526-de09-4c2d-a074-b03380080aee | 8       | 28713   | user28713 | Everything looks stable so far.                  | TEXT         | 2026-03-24 21:56:22.637452+00
+ 15f8764e-15c3-4522-a8e4-643cac660755 | 8       | 28713   | user28713 | Learning something new every day!                | TEXT         | 2026-03-24 21:56:22.630976+00
+ ac90ce9f-58f5-45ff-97b7-81a7b9d8e1f4 | 8       | 28713   | user28713 | Reading documentation again.                     | JOIN         | 2026-03-24 21:56:22.192652+00
+ b69cd9f3-3220-4a71-99c0-ade4699048d8 | 20      | 28713   | user28713 | Reading documentation again.                     | LEAVE        | 2026-03-24 21:48:09.155483+00
+ bbbab219-bf6b-4929-8539-bc496884efc8 | 20      | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 21:48:08.896506+00
+ d535cda8-3bfa-4279-8cb3-b5af4ef6edce | 20      | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:48:08.651139+00
+ 00fc268d-8025-42a1-b1fc-3ac9048763a0 | 20      | 28713   | user28713 | Performance matters.                             | TEXT         | 2026-03-24 21:48:08.518866+00
+ 0b046358-545a-4350-821f-b8c66e650204 | 20      | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:48:08.305562+00
+ f89507ad-99cd-4fd1-a693-b9d108412384 | 20      | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:48:08.133789+00
+ 8fea91cc-7160-4e22-9b86-5cb0a45a06cd | 20      | 28713   | user28713 | Reading documentation again.                     | TEXT         | 2026-03-24 21:48:07.521609+00
+ deef41aa-c595-48e8-b0fb-9393e1375eab | 20      | 28713   | user28713 | Writing unit tests.                              | TEXT         | 2026-03-24 21:48:07.340457+00
+ f7d28005-e47c-4c64-af62-dc43f75f373e | 20      | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:48:07.258939+00
+ 0eef2ec0-39a1-476b-b026-a88a7e1425ba | 20      | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:48:06.649736+00
+ a008d675-2368-4ca5-b879-8df14975c3b2 | 20      | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:48:05.752393+00
+ ff592be1-f523-4b0d-bcd7-f17296cfa506 | 20      | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:48:05.436992+00
+ 80db3abd-da7a-4f6a-8364-96243594bbbe | 20      | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:48:05.415086+00
+ 4136813c-7af2-41a6-a4b6-250594607689 | 20      | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:48:04.922104+00
+ 03c2a4da-3d48-4fc2-adff-462d2094ed7e | 20      | 28713   | user28713 | Running benchmarks right now.                    | TEXT         | 2026-03-24 21:48:04.909568+00
+ 1c3826fb-a56e-410d-bee4-d9ccb8c1bbda | 20      | 28713   | user28713 | Performance matters.                             | TEXT         | 2026-03-24 21:48:04.435543+00
+ 6b9cca6c-c591-4ee1-b880-61015257c162 | 20      | 28713   | user28713 | This bug is driving me crazy.                    | TEXT         | 2026-03-24 21:48:04.053138+00
+ eaac69e6-f7e1-40d2-8cf0-4db6b6faff6a | 20      | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:48:04.012634+00
+ f50e5162-86c0-4661-bc67-6bfe98428464 | 20      | 28713   | user28713 | Performance matters.                             | TEXT         | 2026-03-24 21:48:03.59201+00
+ 0f50ba86-d956-4ce2-81e8-769b9ddb2c9d | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:48:03.069267+00
+ c7616522-b201-48ef-be38-18b584ecc80b | 20      | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 21:48:02.812999+00
+ fcfbcfe6-d628-4815-b948-011fa6b5ac06 | 20      | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 21:48:02.805905+00
+ 388b16fe-c175-4526-9640-23c5a84e7ae6 | 20      | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:48:02.800988+00
+ 6d396fed-8b26-4d15-9bf0-fd0cbf5d633e | 20      | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 21:48:01.181273+00
+ 54333b3f-02c7-4e5f-a1af-6dddf21370b7 | 20      | 28713   | user28713 | Waiting for tests to finish.                     | TEXT         | 2026-03-24 21:48:01.025126+00
+ 22847a24-733a-402c-a943-66854e906016 | 20      | 28713   | user28713 | Hello everyone!                                  | TEXT         | 2026-03-24 21:48:00.383964+00
+ 9e318efb-68f7-40c3-a23c-bc3ed0934b4f | 20      | 28713   | user28713 | Still waiting on feedback.                       | TEXT         | 2026-03-24 21:48:00.184259+00
+ c6cd1e39-4426-474c-a20d-2aa37aa17585 | 20      | 28713   | user28713 | Coffee or tea?                                   | TEXT         | 2026-03-24 21:48:00.160596+00
+ 9a7e0cfc-b876-4f45-bdfb-f8a20d27f68f | 20      | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:47:59.748472+00
+ 4aa971e2-705d-4cbc-822d-a0253fe35de3 | 20      | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:47:58.594478+00
+ ac01d96d-5d48-4bdb-bedf-e848ee051b39 | 20      | 28713   | user28713 | Pair programming is fun.                         | TEXT         | 2026-03-24 21:47:58.083279+00
+ 74595e9d-8279-4280-a06f-694d31cfb818 | 20      | 28713   | user28713 | Hello everyone!                                  | TEXT         | 2026-03-24 21:47:57.241528+00
+ 2c64129b-d63c-43f4-b3c3-1a495d6d2744 | 20      | 28713   | user28713 | Anyone up for a chat?                            | TEXT         | 2026-03-24 21:47:56.035652+00
+ a81c157a-70d1-465f-8d70-7d0ec856c870 | 20      | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:47:55.727525+00
+ 6a5091d0-b397-46f7-805d-7fa394d853c8 | 20      | 28713   | user28713 | Everything looks stable so far.                  | TEXT         | 2026-03-24 21:47:54.362756+00
+ 80316f61-cecd-46d0-8121-ed0283e469b9 | 20      | 28713   | user28713 | Performance matters.                             | TEXT         | 2026-03-24 21:47:53.89329+00
+ bc2d15ba-bf06-4465-84af-66686265c5e5 | 20      | 28713   | user28713 | Refactoring old code.                            | TEXT         | 2026-03-24 21:47:52.471989+00
+ 26ba3cdd-125d-475e-8797-d9fa7d74202d | 20      | 28713   | user28713 | Late night coding session.                       | TEXT         | 2026-03-24 21:47:52.394931+00
+ dbc3d550-6614-4d32-b8e9-ac5e518e1092 | 20      | 28713   | user28713 | This bug is driving me crazy.                    | TEXT         | 2026-03-24 21:47:52.360747+00
+ 6505c30a-5bf5-4f6e-aa93-59b9611d7e5f | 20      | 28713   | user28713 | Performance matters.                             | TEXT         | 2026-03-24 21:47:51.943759+00
+ 322640b1-229d-4713-ade6-9c634a65b27a | 20      | 28713   | user28713 | Code reviews are important.                      | TEXT         | 2026-03-24 21:47:50.253886+00
+ bc302284-39c8-47e5-b29c-c7cae2c14c7d | 20      | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:47:49.801946+00
+ b95d230b-8378-49c3-ae18-6554c85056e1 | 20      | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:47:49.336628+00
+ e6079c4a-dbde-49d5-bdb1-af24b2b9d807 | 20      | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:47:48.878473+00
+ d592e954-28d3-4155-91fb-653659bc83d7 | 20      | 28713   | user28713 | Waiting for tests to finish.                     | TEXT         | 2026-03-24 21:47:48.872088+00
+ 0124996a-0df6-4c98-8b89-2c20aa68ea1c | 20      | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 21:47:48.387878+00
+ bc68f4b5-893c-4da7-9cf8-c4afededbbb6 | 20      | 28713   | user28713 | Still waiting on feedback.                       | TEXT         | 2026-03-24 21:47:48.374781+00
+ d4f8005f-7e39-403a-bb55-c528ec15598e | 20      | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:47:48.310734+00
+ 1f1e4b6b-0806-4d4a-b694-6c54321fc95c | 20      | 28713   | user28713 | Anyone working remotely today?                   | TEXT         | 2026-03-24 21:47:47.900791+00
+ deb49f5b-2159-4fd6-ad3b-eb6cedbc85b2 | 20      | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 21:47:47.355751+00
+ 0ad8f981-85f4-417b-bc98-2d67609c7c2f | 20      | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:47:47.353751+00
+ bf76317c-064a-4163-a454-50d3514788cc | 20      | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 21:47:47.06412+00
+ deba8f60-028e-457b-a573-1d815f2c8643 | 20      | 28713   | user28713 | Good afternoon!                                  | TEXT         | 2026-03-24 21:47:46.832989+00
+ 0efd2e9c-571d-4b0a-8330-3823e9ce9f27 | 20      | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 21:47:46.542598+00
+ 19901673-20a0-4c2b-817a-a2d9bcdc235a | 20      | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:47:45.617985+00
+ d96b6237-7328-4ad6-b706-c118df69ed28 | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:47:45.214676+00
+ e942f973-76ce-4aef-ae03-6e3dfad1d8b1 | 20      | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 21:47:44.729998+00
+ 8dcd3093-09b6-438b-a724-beb61424ad84 | 20      | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 21:47:44.532146+00
+ 845f761f-4d8c-447e-bf64-e187e86140ac | 20      | 28713   | user28713 | Hello everyone!                                  | TEXT         | 2026-03-24 21:47:44.187221+00
+ efde68d8-f03e-439e-b24b-7ee41c21aa8e | 20      | 28713   | user28713 | Anyone attending the next meetup?                | TEXT         | 2026-03-24 21:47:43.686298+00
+ b1563d4c-17e7-45b6-94c4-b680d75bc7b5 | 20      | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:47:43.482909+00
+ aefa9015-64dd-42e3-b00d-11f5233ee8fd | 20      | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:47:43.469223+00
+ 8b4e6fee-a83a-4581-9aca-f5a05fb2a93a | 20      | 28713   | user28713 | Everything looks stable so far.                  | TEXT         | 2026-03-24 21:47:42.636447+00
+ 9401acd3-24e1-47b0-99a4-e87de9b1dd37 | 20      | 28713   | user28713 | Looking forward to the weekend.                  | TEXT         | 2026-03-24 21:47:42.511842+00
+ a162308f-136a-40c9-a928-4f82d17e2430 | 20      | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 21:47:42.412368+00
+ a5678110-9260-4755-8dbf-b28aa96b7f30 | 20      | 28713   | user28713 | Learning something new every day!                | TEXT         | 2026-03-24 21:47:42.386182+00
+ 42b3e235-a8e1-45a0-b59a-65040522879f | 20      | 28713   | user28713 | Coffee or tea?                                   | TEXT         | 2026-03-24 21:47:42.126826+00
+ 89d09ba7-a79f-4648-bfe8-4edb0e4e41eb | 20      | 28713   | user28713 | Anyone attending the next meetup?                | TEXT         | 2026-03-24 21:47:41.910013+00
+ 20994183-370e-47b4-8dc9-35740ab31f99 | 20      | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:47:41.581873+00
+ 910e741c-a286-4e1d-a8c7-87de4ecdd3a4 | 20      | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:47:41.260914+00
+ 917d873a-7406-4096-a596-6fffab8582a1 | 20      | 28713   | user28713 | Does anyone have tips for debugging?             | TEXT         | 2026-03-24 21:47:40.821702+00
+ f09cd889-5c4b-4f5c-9615-d2b46742b0a7 | 20      | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 21:47:39.97217+00
+ e87d7a14-29ce-4d03-bc60-35a984f4d21f | 20      | 28713   | user28713 | Anyone up for a chat?                            | TEXT         | 2026-03-24 21:47:39.277156+00
+ 448a158f-deb2-47b0-ac59-822f0055c877 | 20      | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:47:39.226609+00
+ 694d5eac-b233-4b01-a1e0-84ca7ebc4b4c | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:47:38.719342+00
+ 7e4322fe-6a98-42a7-b1f9-1be8e3c746ac | 20      | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:47:38.668928+00
+ a6b913d1-6fbd-4eaa-85cd-d50cb9e76100 | 20      | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 21:47:38.265457+00
+ 158084d3-572c-49ef-bae1-52834077c594 | 20      | 28713   | user28713 | This API is pretty neat.                         | TEXT         | 2026-03-24 21:47:38.220407+00
+ 05245ee1-d7bb-4b89-8818-bf9772aa7ab5 | 20      | 28713   | user28713 | Full stack development is challenging.           | TEXT         | 2026-03-24 21:47:37.623229+00
+ 86e6f00f-c6ee-4b24-8368-1cff5f12de75 | 20      | 28713   | user28713 | Looking forward to the weekend.                  | TEXT         | 2026-03-24 21:47:37.328695+00
+ 767d8971-13cd-4b79-8efd-ee3f9522507a | 20      | 28713   | user28713 | Anyone attending the next meetup?                | TEXT         | 2026-03-24 21:47:37.232946+00
+ d5bf2b54-9ddc-4111-8475-fc5333ca4bee | 20      | 28713   | user28713 | Good morning!                                    | TEXT         | 2026-03-24 21:47:36.154554+00
+ ffdc572a-fa12-4820-bae5-318c8ac1d71b | 20      | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:47:36.065524+00
+ ff75b4bd-5763-4a77-9806-f3b2de135d25 | 20      | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:47:34.797352+00
+ 64054d2a-548a-49c3-b399-b12e47e8f1f2 | 20      | 28713   | user28713 | Looking forward to the weekend.                  | TEXT         | 2026-03-24 21:47:34.77629+00
+ 580ce1be-9ad7-474c-8feb-a4cc37144dbf | 20      | 28713   | user28713 | Waiting for tests to finish.                     | TEXT         | 2026-03-24 21:47:34.732418+00
+ 41f3281e-2be2-4e5a-89d4-0c1b46d73a34 | 20      | 28713   | user28713 | Good morning!                                    | TEXT         | 2026-03-24 21:47:34.147529+00
+ e4f4e488-311d-4f67-8339-8ed92089569c | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:47:34.02446+00
+ bc64c713-cf10-4d64-8de4-97feb2ac8a52 | 20      | 28713   | user28713 | Anyone working remotely today?                   | TEXT         | 2026-03-24 21:47:33.726752+00
+ b857f15b-e7ce-417f-ae1e-9017aceed2ab | 20      | 28713   | user28713 | Still waiting on feedback.                       | TEXT         | 2026-03-24 21:47:33.604216+00
+ 1ae40463-d663-4ef8-b66d-ea719908ab0f | 20      | 28713   | user28713 | Trying to reduce latency.                        | TEXT         | 2026-03-24 21:47:33.237473+00
+ 6574a37e-ee3b-4292-a824-9419596e72ed | 20      | 28713   | user28713 | Anyone attending the next meetup?                | TEXT         | 2026-03-24 21:47:33.13676+00
+ 2591a885-82f9-43cc-834f-7518036d4c2f | 20      | 28713   | user28713 | Running benchmarks right now.                    | TEXT         | 2026-03-24 21:47:33.101983+00
+ 67ce7c19-3eef-4b11-bac1-26d06eca069b | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:47:32.08319+00
+ 82109649-62d4-459b-9ea0-f78a4b7d873c | 20      | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 21:47:31.354206+00
+ c9077c14-dc01-4c73-a99b-646cd3225e1c | 20      | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 21:47:31.336293+00
+ 01d1ba08-517f-4765-a4f6-81890d1f29f1 | 20      | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 21:47:30.994192+00
+ 9f4dc305-1e63-49e4-9806-ade414d2c559 | 20      | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 21:47:30.590619+00
+ 759f930e-4646-4d46-a61b-af64147e976b | 20      | 28713   | user28713 | Just finished a great book!                      | TEXT         | 2026-03-24 21:47:29.756448+00
+ a26d01b7-12b7-4c08-848f-fa43f898c4ab | 20      | 28713   | user28713 | Looking forward to the weekend.                  | TEXT         | 2026-03-24 21:47:29.026877+00
+ 9ce65eab-248e-4f59-bb9e-5839644d2b02 | 20      | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 21:47:28.709288+00
+ 4a249e1f-5780-4994-93a3-7575b77433b6 | 20      | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:47:26.379374+00
+ 180f2dd4-f2d9-4e4c-bc9e-2e6d8d718983 | 20      | 28713   | user28713 | Just finished a great book!                      | TEXT         | 2026-03-24 21:47:24.557309+00
+ 7993ec88-4213-41bd-a33c-5e504d9584d6 | 20      | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:47:24.241028+00
+ 65c5d079-7be0-4ace-a9d2-9456b7bf80a6 | 20      | 28713   | user28713 | Backend or frontend?                             | TEXT         | 2026-03-24 21:47:24.179723+00
+ d7647d7e-b75f-438f-b873-753ae35612ad | 20      | 28713   | user28713 | Refactoring old code.                            | TEXT         | 2026-03-24 21:47:23.219685+00
+ 27a20e3c-06f1-47de-8863-6a53c0e364c9 | 20      | 28713   | user28713 | Just pushed some code to GitHub.                 | TEXT         | 2026-03-24 21:47:23.173002+00
+ ffd334e6-74c5-4ccf-9652-bf9ab7b176ef | 20      | 28713   | user28713 | This API is pretty neat.                         | TEXT         | 2026-03-24 21:47:22.723636+00
+ e763baf8-069b-41ba-82a8-e682c7972d95 | 20      | 28713   | user28713 | This API is pretty neat.                         | TEXT         | 2026-03-24 21:47:21.861152+00
+ f83e3e3f-a360-4bf7-923c-4bbe0e7e7feb | 20      | 28713   | user28713 | Backend or frontend?                             | TEXT         | 2026-03-24 21:47:21.566155+00
+ d44b24db-d14f-49e4-90b3-70df8bf17b60 | 20      | 28713   | user28713 | Hello everyone!                                  | TEXT         | 2026-03-24 21:47:21.410682+00
+ 9663f92c-c717-4e90-a1c7-417f2391bea8 | 20      | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 21:47:21.180678+00
+ 2e69ae5a-a16c-49a5-a7ae-3c2ab3c51320 | 20      | 28713   | user28713 | Code reviews are important.                      | TEXT         | 2026-03-24 21:47:19.819972+00
+ edd76a7c-50ec-4ee7-aab0-4564b49e36e6 | 20      | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:47:19.807505+00
+ 2be80262-e95b-41c5-a0f8-ca99189a8cc7 | 20      | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:47:19.25966+00
+ a997fda2-9561-411d-8c7b-ce5f33845c15 | 20      | 28713   | user28713 | Looking forward to the weekend.                  | TEXT         | 2026-03-24 21:47:18.830764+00
+ 8740b089-1d1b-4418-8e32-5d38006440bf | 20      | 28713   | user28713 | This bug is driving me crazy.                    | TEXT         | 2026-03-24 21:47:17.701854+00
+ 562956ca-cae2-424f-bbd8-0bf69b62194d | 20      | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:47:17.391015+00
+ f8d49e09-6d26-4b20-9d6f-b54cc9cd6c7a | 20      | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:47:17.390861+00
+ 0336c2c4-4c5d-4993-8236-e94cd7308bba | 20      | 28713   | user28713 | Still waiting on feedback.                       | TEXT         | 2026-03-24 21:47:17.300568+00
+ cd8b6f49-f955-4c6d-9316-729057d3a7aa | 20      | 28713   | user28713 | Backend or frontend?                             | TEXT         | 2026-03-24 21:47:16.932134+00
+ 60e3c230-957e-446e-a5b0-4150d62b6df4 | 20      | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 21:47:16.164429+00
+ 3f6b564a-0f67-4ef2-bfe4-128222924c59 | 20      | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 21:47:15.367142+00
+ b0ec433b-b093-4940-be76-e0f0911da534 | 20      | 28713   | user28713 | Late night coding session.                       | TEXT         | 2026-03-24 21:47:13.743779+00
+ 4e42f139-4afa-4d45-bd90-faa7c50a9ed3 | 20      | 28713   | user28713 | Working on a new project, excited to share soon! | TEXT         | 2026-03-24 21:47:13.638516+00
+ e3f34a09-9c98-47cd-9dc6-9e426097e2da | 20      | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:47:13.615647+00
+ 1fbfb48b-7bf7-4a68-9c00-79c2ed86b7a9 | 20      | 28713   | user28713 | Does anyone have tips for debugging?             | TEXT         | 2026-03-24 21:47:13.30427+00
+ ac018615-6a2a-41cc-abb2-2e1334d77e98 | 20      | 28713   | user28713 | Anyone attending the next meetup?                | TEXT         | 2026-03-24 21:47:13.073861+00
+ a5796353-8ae9-4539-81f5-ce04db81d20a | 20      | 28713   | user28713 | Trying out a new framework.                      | TEXT         | 2026-03-24 21:47:12.946462+00
+ fc4ee92c-6257-4ebd-a342-342254f0953f | 20      | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 21:47:11.950462+00
+ 97147422-1dab-40d7-9879-253e4d25d997 | 20      | 28713   | user28713 | Performance matters.                             | TEXT         | 2026-03-24 21:47:10.599288+00
+ c98ed86f-fd73-4652-9ccf-d22386bdaa21 | 20      | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 21:47:10.389765+00
+ 27340dae-3d4e-4768-ba2c-bd628bf303e9 | 20      | 28713   | user28713 | Writing unit tests.                              | TEXT         | 2026-03-24 21:47:08.270739+00
+ fe577ff0-0474-4010-a0c0-2ffda1f53f0f | 20      | 28713   | user28713 | Does anyone have tips for debugging?             | TEXT         | 2026-03-24 21:47:08.244789+00
+ ec537913-3d2c-4ca8-980d-bb9a020f91b9 | 20      | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:47:06.982918+00
+ b6f9b4af-4a4f-41e6-bfae-795e8733693d | 20      | 28713   | user28713 | This API is pretty neat.                         | TEXT         | 2026-03-24 21:47:06.442318+00
+ 7a331a0f-7daf-4483-95c9-38992efd1ae7 | 20      | 28713   | user28713 | Code reviews are important.                      | TEXT         | 2026-03-24 21:47:06.147715+00
+ 14d87c95-0ec6-4c0e-9f20-61c111a522ac | 20      | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:47:05.389588+00
+ fb41c362-cc2e-415c-8b17-50d41034a230 | 20      | 28713   | user28713 | It's a beautiful day outside.                    | TEXT         | 2026-03-24 21:47:04.595211+00
+ 3830a604-f93a-4867-b542-0d4207e4a982 | 20      | 28713   | user28713 | Writing unit tests.                              | TEXT         | 2026-03-24 21:47:04.247279+00
+ edf7cb4b-128c-459e-adf3-1d48fb2c37d0 | 20      | 28713   | user28713 | Just joined the channel!                         | TEXT         | 2026-03-24 21:47:04.206605+00
+ 36c42d4a-2479-4cb5-9454-0037de420535 | 20      | 28713   | user28713 | Almost done with this feature.                   | TEXT         | 2026-03-24 21:47:04.111894+00
+ bc44dc03-64a3-414b-98ac-07def39cbf72 | 20      | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 21:47:03.127639+00
+ f7e41e73-8f0a-4563-8dcf-71fff9bc2bbf | 20      | 28713   | user28713 | Good afternoon!                                  | TEXT         | 2026-03-24 21:47:03.043492+00
+ d13dd982-da6e-4dcd-a83c-3cef9daabfe0 | 20      | 28713   | user28713 | Anyone up for a chat?                            | TEXT         | 2026-03-24 21:47:03.007959+00
+ 133f17d2-47af-4a0b-93fc-7f186f86cc47 | 20      | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:47:02.644105+00
+ 7a5e519d-28d2-4370-b8c8-f4eb0fcd786d | 20      | 28713   | user28713 | Pair programming is fun.                         | TEXT         | 2026-03-24 21:47:01.756284+00
+ 06fce029-4cb0-415c-a573-6d41333a30d8 | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:47:01.083097+00
+ 9eb1dce4-9c95-4e4f-9aed-d6f45d249984 | 20      | 28713   | user28713 | Does anyone have deployment tips?                | TEXT         | 2026-03-24 21:47:01.067646+00
+ b4f9a1bd-23ad-4d68-af9f-827e98304602 | 20      | 28713   | user28713 | Backend or frontend?                             | TEXT         | 2026-03-24 21:47:00.463094+00
+ 55f0c0ba-2b02-4120-9454-29d241b8f9db | 20      | 28713   | user28713 | Code reviews are important.                      | TEXT         | 2026-03-24 21:46:59.969594+00
+ 3de8e33d-4d88-4360-9fc9-cd7d02325570 | 20      | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:46:59.913007+00
+ 0b98a82d-c28f-4ea7-a486-55ae3ef220a7 | 20      | 28713   | user28713 | Running benchmarks right now.                    | TEXT         | 2026-03-24 21:46:59.440674+00
+ 3dfd526a-4ca6-49ba-949e-031a6cc082d2 | 20      | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:46:59.331886+00
+ 81175825-b57a-41d3-8f16-c6d7efef4ed9 | 20      | 28713   | user28713 | Backend or frontend?                             | TEXT         | 2026-03-24 21:46:58.63197+00
+ 4ca63bb5-fe97-431f-b066-4f2d8012e51b | 20      | 28713   | user28713 | Hello everyone!                                  | TEXT         | 2026-03-24 21:46:56.519104+00
+ 71bdab4e-93f0-4428-8cf4-5b6a04da0ee5 | 20      | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 21:46:54.450681+00
+ edfea4cc-3872-4f6b-9a55-0fdc8c7d59ff | 20      | 28713   | user28713 | It's a beautiful day outside.                    | TEXT         | 2026-03-24 21:46:53.822892+00
+ ba31410f-ae9e-4722-9814-75b8ee614523 | 20      | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:46:53.640668+00
+ b64fbb3f-233f-4938-b1ba-1336bc036311 | 20      | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:46:53.353666+00
+ dda8d791-a207-4045-ba91-199609d0cddd | 20      | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:46:53.096492+00
+ d3a8a759-64ae-43f2-8431-88ee47b208ca | 20      | 28713   | user28713 | Hello everyone!                                  | TEXT         | 2026-03-24 21:46:52.341525+00
+ 5b99b98c-350b-442e-8af9-067c5cfb9d79 | 20      | 28713   | user28713 | This API is pretty neat.                         | TEXT         | 2026-03-24 21:46:52.309662+00
+ 0ba5df59-9629-4ab7-837e-e4f932ddf0e4 | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:46:51.708783+00
+ 07fcbf59-a46d-4217-80d7-55473af56b54 | 20      | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 21:46:50.550803+00
+ 004bf032-84e8-45ec-95af-0bdbc7200f48 | 20      | 28713   | user28713 | Everything looks stable so far.                  | TEXT         | 2026-03-24 21:46:50.175469+00
+ c9de711f-0d66-40ec-bcd4-cc7751303c12 | 20      | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:46:49.676335+00
+ f134cdb5-3b1d-4824-887e-71b50c360445 | 20      | 28713   | user28713 | Almost done with this feature.                   | TEXT         | 2026-03-24 21:46:49.57656+00
+ e17b627d-ba5f-425c-bab1-932cf543ab5d | 20      | 28713   | user28713 | Late night coding session.                       | TEXT         | 2026-03-24 21:46:48.643771+00
+ 15350003-53d6-4de2-98c4-9193f9c74cd3 | 20      | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 21:46:47.827071+00
+ 0044817c-f737-40cc-ba02-1a1d524839a2 | 20      | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:46:47.503418+00
+ 555ffb00-ca7b-4134-955a-e6470c7864dd | 20      | 28713   | user28713 | What's your favorite programming language?       | TEXT         | 2026-03-24 21:46:47.050605+00
+ 872c32c3-b6c6-4e00-8ff1-ca7fc5f6cb77 | 20      | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 21:46:46.983221+00
+ 0c26d946-f215-4c09-8e25-ebb09e8a94bb | 20      | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:46:46.851527+00
+ 9de61bfd-aa38-4ea3-b74f-51fff766c4de | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:46:46.422152+00
+ e2a508c3-09b9-42b1-b0f1-3f8756df1c34 | 20      | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:46:46.368787+00
+ fe879717-c923-4a7d-9b7f-0f2756a15c6b | 20      | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 21:46:46.029476+00
+ d3628856-99e5-4737-8e7d-9562cb940a46 | 20      | 28713   | user28713 | Does anyone have tips for debugging?             | TEXT         | 2026-03-24 21:46:45.983435+00
+ 5b9921e9-d119-48fc-81e9-c61f3339bf70 | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:46:45.438996+00
+ e894f94e-521d-495b-b559-e8f9a15ab508 | 20      | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:46:44.98992+00
+ 439936a8-2b3c-400b-bd4a-29eea2f3223a | 20      | 28713   | user28713 | This API is pretty neat.                         | TEXT         | 2026-03-24 21:46:44.91099+00
+ d746f9e0-8679-4404-a9ff-2576853e8c81 | 20      | 28713   | user28713 | Trying to reduce latency.                        | TEXT         | 2026-03-24 21:46:44.840103+00
+ deebad99-1248-4eb1-a7bf-ae945b06be55 | 20      | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:46:44.465636+00
+ 6b6a0a35-aac6-4312-aa76-cffc4d5f73cf | 20      | 28713   | user28713 | How's it going?                                  | TEXT         | 2026-03-24 21:46:43.233474+00
+ 766917c9-072f-482b-9ab8-927e4af38ba0 | 20      | 28713   | user28713 | Writing unit tests.                              | TEXT         | 2026-03-24 21:46:42.270489+00
+ e5c31d27-0cfa-4a6d-95cc-85ea3c3756ea | 20      | 28713   | user28713 | Reading documentation again.                     | TEXT         | 2026-03-24 21:46:42.075972+00
+ c3350bd8-3d84-48d6-97e2-5da94e7e1916 | 20      | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 21:46:41.779104+00
+ 388d27b6-0fa1-446d-8cca-4d20e4cefb4f | 20      | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 21:46:41.736564+00
+ 852c1f7a-e8c8-4b5b-b2e9-02f65a99550b | 20      | 28713   | user28713 | Refactoring old code.                            | TEXT         | 2026-03-24 21:46:40.032084+00
+ b18cf4d9-093e-439f-b3f1-6c354b3172c5 | 20      | 28713   | user28713 | Hope everyone is doing well.                     | TEXT         | 2026-03-24 21:46:39.197294+00
+ ce537d47-3065-4bcd-9e70-5635a1c7fc40 | 20      | 28713   | user28713 | Just finished a great book!                      | TEXT         | 2026-03-24 21:46:38.688776+00
+ 44e783ce-774d-43b4-9935-ac2b64bcb56a | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:46:38.340233+00
+ 4c1046a2-6293-446b-9427-bcae917f9ac0 | 20      | 28713   | user28713 | Almost done with this feature.                   | TEXT         | 2026-03-24 21:46:37.968321+00
+ 77e9ae2f-9ad4-443b-81e1-8b8b141faefc | 20      | 28713   | user28713 | Reading documentation again.                     | TEXT         | 2026-03-24 21:46:37.582613+00
+ 62bf50cf-f695-47ac-89be-748a4d0c6957 | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:46:37.575957+00
+ 49eebb95-69a3-40ac-8346-78cb0f7e28b2 | 20      | 28713   | user28713 | Good evening!                                    | TEXT         | 2026-03-24 21:46:37.517452+00
+ 84236c2c-ced4-44c9-8a6c-37126c108e61 | 20      | 28713   | user28713 | Pair programming is fun.                         | TEXT         | 2026-03-24 21:46:36.892993+00
+ 7f7ab8f1-1edb-4881-ad62-e4f7c13ad71d | 20      | 28713   | user28713 | Running benchmarks right now.                    | TEXT         | 2026-03-24 21:46:35.518097+00
+ 7c1153c3-474d-47b8-8800-b47709eab6c3 | 20      | 28713   | user28713 | Investigating a production issue.                | TEXT         | 2026-03-24 21:46:35.330803+00
+ d846c2aa-b9ef-4be2-9e79-f39c6b28e395 | 20      | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:46:35.049995+00
+ 8ebc95af-4d7b-4b54-8bc5-f2c991639318 | 20      | 28713   | user28713 | Late night coding session.                       | TEXT         | 2026-03-24 21:46:34.982322+00
+ 2913ef81-82f8-48ba-a866-efbc4ae93c32 | 20      | 28713   | user28713 | Does anyone have tips for debugging?             | TEXT         | 2026-03-24 21:46:34.858874+00
+ 7b15f32b-16e8-4a40-84b8-8d5c4b681ee6 | 20      | 28713   | user28713 | Early morning standup.                           | TEXT         | 2026-03-24 21:46:34.283434+00
+ 4479e1f9-b343-44f1-abc2-bd01d7e4a1ce | 20      | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 21:46:33.993155+00
+ a9d6784a-809b-4e1a-a2cc-867d37f46446 | 20      | 28713   | user28713 | Just pushed some code to GitHub.                 | TEXT         | 2026-03-24 21:46:33.833581+00
+ af512f2a-2da2-4867-974b-6b2e065dbc06 | 20      | 28713   | user28713 | Reading documentation again.                     | TEXT         | 2026-03-24 21:46:33.333146+00
+ 3256de07-7026-433a-844e-f755e3465423 | 20      | 28713   | user28713 | Anyone working remotely today?                   | TEXT         | 2026-03-24 21:46:33.23903+00
+ 9d323869-f6c9-42a6-882d-7e25d84b6e8d | 20      | 28713   | user28713 | Running integration tests.                       | TEXT         | 2026-03-24 21:46:33.181746+00
+ 5d00b8c0-4817-4604-9f3c-8e85a657a53a | 20      | 28713   | user28713 | Any movie recommendations?                       | TEXT         | 2026-03-24 21:46:32.884461+00
+ c3867c01-31f7-403b-ba03-9eceeaf5b299 | 20      | 28713   | user28713 | Waiting for tests to finish.                     | TEXT         | 2026-03-24 21:46:32.852566+00
+ 41ca812f-c37d-4057-b38e-d1487ae573d2 | 20      | 28713   | user28713 | Trying to optimize performance.                  | TEXT         | 2026-03-24 21:46:32.325518+00
+ 652c05f0-fd80-4a30-9b00-fee08d817650 | 20      | 28713   | user28713 | What are you working on today?                   | TEXT         | 2026-03-24 21:46:32.310747+00
+ bbabc13d-9856-447b-b676-0a0a57df779a | 20      | 28713   | user28713 | Just deployed my app!                            | TEXT         | 2026-03-24 21:46:30.840808+00
+ d1b17401-8940-4066-a822-3c026654cf7a | 20      | 28713   | user28713 | Did you see the game last night?                 | TEXT         | 2026-03-24 21:46:30.675816+00
+ f6cb9830-64d4-4dab-9f2b-95845f50d146 | 20      | 28713   | user28713 | Hello everyone!                                  | TEXT         | 2026-03-24 21:46:30.115144+00
+ 0a68f937-0f08-421a-b018-d74f4f940b65 | 20      | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 21:46:30.041597+00
+ f22839d1-49e3-4bb6-b376-4db28a2a9101 | 20      | 28713   | user28713 | Still waiting on feedback.                       | TEXT         | 2026-03-24 21:46:30.027067+00
+ e2372c63-2b25-4de6-bacd-fdccfeddf244 | 20      | 28713   | user28713 | Good morning!                                    | TEXT         | 2026-03-24 21:46:29.655027+00
+ 0667caf2-82a5-4bcf-9964-7df76a336677 | 20      | 28713   | user28713 | Monitoring system metrics.                       | TEXT         | 2026-03-24 21:46:29.062902+00
+ 449cc7c1-5ca9-47d6-9a1b-76a1a953941d | 20      | 28713   | user28713 | Almost done with this feature.                   | TEXT         | 2026-03-24 21:46:29.041879+00
+ 73ceb3bf-aad7-47d2-803a-9aca29221cf8 | 20      | 28713   | user28713 | Performance matters.                             | TEXT         | 2026-03-24 21:46:28.792046+00
+ dec38af8-ce9b-4914-9cea-81b155adf709 | 20      | 28713   | user28713 | Coffee or tea?                                   | TEXT         | 2026-03-24 21:46:28.195518+00
+ eea02153-5dd0-45f1-8dca-9004f696dc14 | 20      | 28713   | user28713 | Does anyone have tips for debugging?             | TEXT         | 2026-03-24 21:46:28.081224+00
+ 26709ba1-cef4-4ec1-aea9-0b902c43a94f | 20      | 28713   | user28713 | Scaling up the service.                          | TEXT         | 2026-03-24 21:46:28.069104+00
+ 0d63f85a-b681-4dc3-bb3d-599130faaeac | 20      | 28713   | user28713 | Just finished a great book!                      | TEXT         | 2026-03-24 21:46:26.643025+00
+ 99be3fa7-827e-4d77-b41a-e4caaeaefe4e | 20      | 28713   | user28713 | Looking forward to the weekend.                  | JOIN         | 2026-03-24 21:46:26.569067+00
+(438 rows)
+
+Time: 6030.512 ms (00:06.031)
+ count 
+-------
+     0
+(1 row)
+
+Time: 7.045 ms
+ room_id |         last_activity         
+---------+-------------------------------
+ 6       | 2026-03-24 22:19:42.904072+00
+ 4       | 2026-03-24 22:14:08.656044+00
+ 8       | 2026-03-24 21:57:50.576672+00
+ 20      | 2026-03-24 21:48:09.155483+00
+(4 rows)
+
+Time: 5864.799 ms (00:05.865)

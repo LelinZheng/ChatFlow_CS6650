@@ -40,7 +40,7 @@ public class LoadTestClient {
 //    String consumerUrl = "http://localhost:8081";
 //    URI wsBaseUri = URI.create("ws://localhost:8080/chat");
     String serverUrl   = "http://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com";
-    String consumerUrl = "http://34.217.76.239:8081";
+    String consumerUrl = "http://16.146.149.132:8081";
     URI wsBaseUri = URI.create("ws://chat-server-v2-ALB-191353243.us-west-2.elb.amazonaws.com/chat");
 
     System.out.println("Performing server health check...");
