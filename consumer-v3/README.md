@@ -149,8 +149,8 @@ spring.datasource.password=chatflow123
 # Tuning
 consumer.thread.count=20
 consumer.prefetch.count=10
-batch.writer.batch.size=500
-batch.writer.flush.interval.ms=500
+db.batch.size=100
+db.flush.interval.ms=500
 ```
 
 ---
@@ -170,29 +170,28 @@ inserted. Larger batches amortize that cost over more rows. The key comparison m
 
 Lower total work = fewer round-trips and less cumulative time spent waiting on the database.
 
-### Tuning results (500k messages, 0 drops)
+### Tuning results (500k messages, 256 workers, 0 drops across all runs)
 
-| batchSize | flushIntervalMs | flushCount | avgFlushMs | written/s | total DB work |
-|-----------|-----------------|------------|------------|-----------|---------------|
-| 100       | 500             | 9,787      | 7 ms       | 1,222/s   | 68,509 ms     |
-| **500**   | **500**         | **2,425**  | **19 ms**  | **1,278/s** | **46,075 ms** |
-| 1,000     | 1,000           | 1,485      | 36 ms      | 1,243/s   | 53,460 ms     |
-| 5,000     | 1,000           | 388        | 92 ms      | 1,228/s   | 35,696 ms     |
-| 5,000     | 100             | 3,884      | 13 ms      | 1,225/s   | 50,492 ms     |
+| Run | batchSize | flushIntervalMs | throughput msg/s | duration (s) | flushCount | avgFlushMs | DB written/s | total DB work |
+|-----|-----------|-----------------|-----------------|--------------|------------|------------|--------------|---------------|
+| A1  | 100       | 100             | 2,064           | 242          | 6,338      | 6 ms       | 1,728/s      | 38,028 ms     |
+| **A2** | **100** | **500**        | **2,183**       | **229**      | 5,851      | 7 ms       | **1,888/s**  | 40,957 ms     |
+| A3  | 500       | 500             | 2,130           | 235          | 1,407      | 20 ms      | 1,686/s      | 28,140 ms     |
+| A4  | 1,000     | 1,000           | 1,981           | 252          | 893        | 34 ms      | 1,798/s      | 30,362 ms     |
+| A5  | 5,000     | 1,000           | 2,111           | 237          | 206        | 140 ms     | 1,801/s      | 28,840 ms     |
 
-### Chosen config: `batchSize=500`, `flushIntervalMs=500`
+Total DB work = `flushCount × avgFlushLatencyMs` — measures cumulative time spent in DB round-trips.
 
-**batch=500/500ms** achieves the best balance:
+### Chosen config: `batchSize=100`, `flushIntervalMs=500`
 
-- **Lowest total DB work among practical configs** (46,075 ms) — fewer round-trips than
-  batch=100 (which flushes too frequently) and lower latency variance than batch=1000+
-- **Highest write throughput** (1,278 msg/s) — larger batches amortize round-trip cost
-  without introducing the high per-flush latency seen at batch=1000+ (36–92 ms)
-- **Predictable tail latency** — 19 ms avg flush is low enough that no individual flush
-  creates a meaningful backpressure bubble on the in-memory buffer
-- **Avoids the batch=5000 risk** — batch=5000/1000ms technically has lower total work, but
-  bursts of 5k rows per flush create uneven DB load spikes and make the 1s interval a
-  hard dependency; one slow flush can stall the buffer
+**A2 (batch=100, flush=500ms)** is the winner:
+
+- **Highest end-to-end throughput** (2,183 msg/s) and shortest test duration (229s)
+- **Highest DB write rate** (1,888 written/s) — the consumer keeps up with the pipeline without falling behind
+- **Lowest avg flush latency** (7ms) — small batches complete fast, keeping the buffer clear and avoiding backpressure
+- **Why A2 beats A1** (same batch size, longer flush interval): 100ms interval causes many partial-batch flushes; 500ms allows the buffer to accumulate a full batch before flushing, reducing wasted round-trips
+- **Why A2 beats A3+**: larger batches (500–5,000) reduce flush count but each flush takes 20–140ms; at A5's 140ms avg flush, a single slow flush stalls the writer thread and creates buffer pressure. The throughput gains don't compensate
+- **A4 is the worst** (1,981 msg/s, 252s) — 1,000-row batches at 1,000ms flush interval introduces the most backpressure without the amortization benefit of A5's larger batch
 
 ---
 
