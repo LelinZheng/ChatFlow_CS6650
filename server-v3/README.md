@@ -129,9 +129,19 @@ GET /health
 
 ### Metrics
 ```bash
-GET /api/metrics?roomId=5&userId=42&startTime=2026-03-01T00:00:00Z&endTime=2026-03-01T01:00:00Z&topN=10&sampleSize=10
+GET /api/metrics?roomId=5&userId=42&startTime=2026-03-01T00:00:00Z&endTime=2026-03-01T01:00:00Z&topN=10&sampleSize=1000
 ```
-All parameters are optional — if omitted, the endpoint auto-selects the most active room/user and the full time range.
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `roomId` | string | most active room | Room ID for the room time-range query |
+| `userId` | string | most active user | User ID for history and user-rooms queries |
+| `startTime` | ISO-8601 | earliest message | Start of time window |
+| `endTime` | ISO-8601 | latest message | End of time window |
+| `topN` | int | 10 | Result count for top-N analytics queries |
+| `sampleSize` | int | 1000 | Max rows returned per core query list |
+
+All parameters are optional. If omitted, the endpoint auto-selects the most active room/user and the full time range from the data. Returns `{"totalMessages": 0, "message": "No messages in database yet."}` if the table is empty.
 
 ```json
 {
@@ -153,6 +163,16 @@ All parameters are optional — if omitted, the endpoint auto-selects the most a
     "mostActiveUsers": [...],
     "mostActiveRooms": [...],
     "userParticipationPatterns": [...]
+  },
+  "queryTimingsMs": {
+    "roomMessagesInTimeRangeMs": 131,
+    "userMessageHistoryMs": 19,
+    "activeUserCountMs": 126,
+    "userRoomsParticipatedMs": 3,
+    "messagesPerMinuteMs": 174,
+    "mostActiveUsersMs": 153,
+    "mostActiveRoomsMs": 114,
+    "userParticipationPatternsMs": 645
   }
 }
 ```
