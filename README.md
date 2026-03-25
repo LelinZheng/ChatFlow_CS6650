@@ -169,11 +169,11 @@ Extended load test client. Adds correct echo matching by `messageId`, post-test 
 ### Deployment
 | Component | Instance Type | Count | Notes |
 |---|---|---|---|
-| Server-v3 | t3.micro | 1 / 2 / 4 | Behind ALB |
+| Server-v3 | t3.micro | 4 | Behind ALB |
 | Consumer-v3 | t3.micro | 1 | Fixed single instance |
 | RabbitMQ | t3.micro | 1 | Docker, dedicated instance |
 | Redis | t3.micro | 1 | Docker, dedicated instance |
-| PostgreSQL | RDS db.t3.micro | 1 | AWS managed |
+| PostgreSQL | t3.micro | 1 | EC2-hosted PostgreSQL 16 |
 
 Region: `us-west-2`
 
@@ -197,13 +197,15 @@ ChatFlow_CS6650/
 ├── server-v3/               # Assignment 3 — server with analytics API
 ├── consumer-v3/             # Assignment 3 — consumer with DB persistence
 ├── client-v3/               # Assignment 3 — client with post-test collection
+├── database/                # Assignment 3 — schema.sql, reset.sql
 │
 ├── deployment/              # Docker Compose, EC2 setup, ALB config
-├── monitoring/              # Graph generation scripts
+├── monitoring/              # Assignment 2 graph generation scripts
+├── monitoring-v3/           # Assignment 3 monitoring scripts (DB, queue, consumer)
 │
 ├── results/                 # Assignment 1 test outputs and charts
 ├── results/v2/              # Assignment 2 test outputs and charts
-├── results/v3/              # Assignment 3 test outputs and charts
+├── load-tests/              # Assignment 3 test outputs, logs, and charts
 └── doc/                     # Architecture document and diagrams
 ```
 
@@ -224,8 +226,8 @@ ChatFlow_CS6650/
 - **Python 3** (matplotlib, pandas — graph generation)
 
 ### Assignment 3
-- **PostgreSQL 16** (via Spring Data JPA + HikariCP)
-- **AWS RDS** (managed PostgreSQL)
+- **PostgreSQL 16** (via Spring JDBC + HikariCP, EC2-hosted)
+- **Batch writing** with circuit breaker, exponential backoff retry, and dead letter queue
 
 ---
 
